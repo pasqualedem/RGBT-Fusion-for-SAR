@@ -3,9 +3,9 @@ import time
 from PIL import Image
 from accelerate import Accelerator
 
-from colorlog import getLogger
+from sarfusion.utils.logger import get_logger
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def main_process_only(func):

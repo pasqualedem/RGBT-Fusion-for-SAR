@@ -4,11 +4,11 @@ import copy
 import gc
 import os
 import uuid
-from colorlog import getLogger
 import pandas as pd
 from typing import Mapping
 from easydict import EasyDict
 
+from sarfusion.utils.logger import get_logger
 from sarfusion.experiment.run import Run
 from sarfusion.experiment.parallel import ParallelRun
 from sarfusion.utils.utils import get_timestamp, load_yaml, nested_dict_update, update_collection
@@ -16,7 +16,7 @@ from sarfusion.utils.grid import linearize, linearized_to_string, make_grid
 from sarfusion.utils.optuna import Optunizer
 
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class GridSummary:

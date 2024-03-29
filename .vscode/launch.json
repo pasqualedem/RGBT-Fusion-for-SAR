@@ -5,13 +5,22 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Preprocess for classification",
             "type": "debugpy",
             "request": "launch",
             "program": "main.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["preprocess_classification"]
+            "args": [
+                "preprocess_classification"
+            ]
         },
         {
             "name": "Experiment",
@@ -20,7 +29,9 @@
             "program": "main.py",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "args": ["experiment"]
+            "args": [
+                "experiment"
+            ]
         }
     ]
 }

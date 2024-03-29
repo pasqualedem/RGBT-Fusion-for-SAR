@@ -3,12 +3,11 @@ import sys
 import uuid
 import os
 
-from colorlog import getLogger
-
+from sarfusion.utils.logger import get_logger
 from sarfusion.utils.utils import write_yaml
 
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 class ParallelRun:
     slurm_command = "sbatch"

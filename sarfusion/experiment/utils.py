@@ -3,7 +3,6 @@ import gc
 import contextlib
 from copy import deepcopy
 
-from colorlog import getLogger
 import torch
 from accelerate import Accelerator
 from accelerate.logging import get_logger
@@ -11,9 +10,9 @@ from transformers import get_scheduler as get_transformers_scheduler
 
 from sarfusion.data.utils import DataDict
 from sarfusion.tracker.abstract_tracker import AbstractLogger
-from sarfusion.utils.utils import find_divisor_pairs, get_divisors
+from sarfusion.utils.logger import get_logger
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def parse_params(params_dict):

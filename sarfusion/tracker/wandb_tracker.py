@@ -4,7 +4,6 @@ import math
 import os
 from typing import Optional, Union, Any
 
-from colorlog import getLogger
 import pandas as pd
 import numpy as np
 
@@ -17,11 +16,11 @@ from matplotlib import pyplot as plt
 from sarfusion.tracker.abstract_tracker import AbstractLogger, main_process_only
 
 from accelerate import Accelerator
-from sarfusion.tracker.utils import get_tmp_dir
 from sarfusion.utils.utils import write_yaml
+from sarfusion.utils.logger import get_logger
 
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 WANDB_ID_PREFIX = "wandb_id."
 WANDB_INCLUDE_FILE_NAME = ".wandbinclude"

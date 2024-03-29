@@ -22,7 +22,7 @@ parameters:
     initial_lr: [0.00001]
     optimizer: [AdamW]
     watch_metric: [loss]
-    freeze_backbone: [True]
+    freeze_backbone: [False]
   
   loss:
     name: [CrossEntropyLoss]

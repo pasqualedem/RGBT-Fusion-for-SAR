@@ -8,10 +8,10 @@ import torch
 from accelerate import Accelerator, DistributedDataParallelKwargs
 from accelerate.utils import set_seed
 from torch.optim import AdamW
-from colorlog import getLogger
 from torchmetrics import MetricCollection
 from tqdm import tqdm
 
+from sarfusion.utils.logger import get_logger
 from sarfusion.data import get_dataloaders
 from sarfusion.data.utils import DataDict
 from sarfusion.experiment.utils import WrapperModule
@@ -34,7 +34,7 @@ from .utils import (
 )
 from copy import deepcopy
 
-logger = getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Run:

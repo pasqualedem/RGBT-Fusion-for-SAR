@@ -16,7 +16,7 @@ def backbone_learnable_params(self, train_params: dict):
     if freeze_backbone:
         for param in self.vit.parameters():
             param.requires_grad = False
-        return self.classifier.parameters()
+        return [{"params": [x[1] for x in self.named_parameters() if x[1].requires_grad]}]
     return self.parameters()
 
 def build_vit_classifier(**params):
