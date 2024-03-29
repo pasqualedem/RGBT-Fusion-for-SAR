@@ -5,7 +5,7 @@ import torchvision.transforms as T
 from transformers import AutoProcessor
 
 from sarfusion.data.sard import PoseClassificationDataset
-from sarfusion.data.utils import DataDict
+from sarfusion.data.utils import DataDict, dict_collate_fn
 
 
 DATASET_REGISTRY = {
@@ -27,7 +27,7 @@ def build_preprocessor(params):
     ])
 
 
-def get_trainval(dataset_params, dataloader_params):
+def get_dataloaders(dataset_params, dataloader_params):
     dataset_params = dataset_params.copy()
     
     transforms = build_preprocessor(dataset_params)
@@ -37,16 +37,37 @@ def get_trainval(dataset_params, dataloader_params):
     dataclass = DATASET_REGISTRY[name]
     train_root = os.path.join(root, "train")
     val_root = os.path.join(root, "valid")
+    test_root = os.path.join(root, "test")
 
     train_set = dataclass(
         train_root,
         transform=transforms,
         **dataset_params,
     )
+    train_loader = torch.utils.data.DataLoader(
+        train_set,
+        collate_fn=dict_collate_fn,
+        **dataloader_params,
+    )
     val_set = dataclass(
         val_root,
         transform=transforms,
         **dataset_params,
     )
+    val_loader = torch.utils.data.DataLoader(
+        val_set,
+        collate_fn=dict_collate_fn,
+        **dataloader_params,
+    )
+    test_set = dataclass(
+        test_root,
+        transform=transforms,
+        **dataset_params,
+    )
+    test_loader = torch.utils.data.DataLoader(
+        test_set,
+        collate_fn=dict_collate_fn,
+        **dataloader_params,
+    )                                         
 
-    return train_set, val_set
+    return train_loader, val_loader, test_loader
