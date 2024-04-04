@@ -13,16 +13,16 @@ class WrapperModelOutput(ModelOutput):
     logits: torch.Tensor = None
 
 
-class ModelWrapper(nn.Module):
-    def __init__(self, model, loss):
-        super(ModelWrapper, self).__init__()
-        self.model = model
-        self.loss = loss
+# class ModelWrapper(nn.Module):
+#     def __init__(self, model, loss):
+#         super(ModelWrapper, self).__init__()
+#         self.model = model
+#         self.loss = loss
         
-    def forward(self, pixel_values, labels):
-        outputs = self.model(pixel_values)
-        if self.loss is None:
-            return WrapperModelOutput(logits=outputs.logits)
-        loss = self.loss(outputs.logits, labels)
-        return WrapperModelOutput(loss=loss, logits=outputs.logits)
+#     def forward(self, pixel_values, labels):
+#         outputs = self.model(pixel_values)
+#         if self.loss is None:
+#             return WrapperModelOutput(logits=outputs.logits)
+#         loss = self.loss(outputs.logits, labels)
+#         return WrapperModelOutput(loss=loss, logits=outputs.logits)
         

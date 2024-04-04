@@ -48,7 +48,6 @@ class Run:
         self.model = None
         self.scheduler = None
         self.criterion = None
-        self.oom = None
         self.best_metric = None
         self.scheduler_step_moment = None
         self.watch_metric = None
@@ -123,7 +122,7 @@ class Run:
         else:
             params = self.model.get_learnable_params(self.train_params)
         self.optimizer = AdamW(
-            params,
+            self.model.parameters(),
             lr=self.train_params["initial_lr"],
         )
 
@@ -262,7 +261,6 @@ class Run:
         batch_idx: int,
     ):
         try:
-            pass
             outputs = self.model(input_dict)
         except RuntimeError as e:
             if "out of memory" in str(e):
@@ -273,13 +271,8 @@ class Run:
                     epoch,
                     batch_idx,
                 )
-                if self.oom:
-                    raise e
-                self.oom = True
                 return e
-            else:
-                raise e
-        self.oom = False
+            raise e
         return outputs
 
     def _backward(self, batch_idx, input_dict, outputs, loss_normalizer):
@@ -309,11 +302,12 @@ class Run:
         tot_steps: int,
     ):
         with self.accelerator.no_sync(model=metrics):
-            metrics_dict = metrics(preds, gt)
-        if tot_steps % self.tracker.log_frequency == 0:
-            for metric_name, metric_value in metrics_dict.items():
-                metric_value = torch.mean(self.accelerator.gather(metric_value))
-                self.tracker.log_metric(metric_name, metric_value)
+            metrics.update(preds, gt)
+            metrics_dict = metrics.compute()
+        # if tot_steps % self.tracker.log_frequency == 0:
+        #     for metric_name, metric_value in metrics_dict.items():
+        #         metric_value = torch.mean(self.accelerator.gather(metric_value))
+        #         self.tracker.log_metric(metric_name, metric_value)
         # .item() to all values
         metrics_dict = {k: v.item() for k, v in metrics_dict.items()}
         return metrics_dict
@@ -329,21 +323,15 @@ class Run:
 
     def _update_train_metrics(
         self,
-        previous_metric_values: dict,
         preds: torch.tensor,
         gt: torch,
         tot_steps: int,
         step: int,
     ):
         self.tracker.log_metric("step", self.global_train_step)
-        if step == 0:
-            metric_values = self._update_metrics(
-                self.train_metrics, preds, gt, tot_steps
-            )
-        else:
-            metric_values = previous_metric_values
-        if tot_steps % self.tracker.log_frequency == 0:
-            self.tracker.log_metric("lr", self._get_lr())
+        metric_values = self._update_metrics(
+            self.train_metrics, preds, gt, tot_steps
+        )
         return metric_values
 
     def train_epoch(
@@ -368,25 +356,21 @@ class Run:
             postfix={"loss": 0},
             desc=f"Train Epoch {epoch}/{self.train_params['max_epochs']-1}",
         )
-        self.oom = False
         metric_values = None
 
         for batch_idx, batch_dict in bar:
+            self.optimizer.zero_grad()
             result_dict = self._forward(batch_dict, epoch, batch_idx)
-            if isinstance(result_dict, RuntimeError):
-                break
             loss = self._backward(batch_idx, batch_dict, result_dict, loss_normalizer)
             outputs = result_dict[ResultDict.LOGITS]
             preds = outputs.argmax(dim=1)
             self.optimizer.step()
             self._scheduler_step(SchedulerStepMoment.BATCH)
-            self.optimizer.zero_grad()
 
             loss_avg.update(loss.item())
             self.tracker.log_metric("loss", loss.item())
 
             metric_values = self._update_train_metrics(
-                metric_values,
                 preds,
                 batch_dict[DataDict.TARGET],
                 tot_steps,
@@ -408,13 +392,7 @@ class Run:
         logger.info(f"Finished Epoch {epoch}")
         logger.info(f"Metrics")
         metric_dict = {
-            **{
-                "avg_" + k: v
-                for k, v in {
-                    **self.train_metrics.compute(),
-                    **self.train_metrics.compute(),
-                }.items()
-            },
+            **self.train_metrics.compute(),
             "avg_loss": loss_avg.compute(),
         }
         for k, v in metric_dict.items():
@@ -462,6 +440,8 @@ class Run:
                         "loss": loss.item(),
                     }
                 )
+                
+                self.global_val_step += 1
 
             self.tracker.log_metrics(
                 {

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from torchmetrics import Accuracy, MetricCollection, Precision, Recall, F1Score, JaccardIndex, ConfusionMatrix
+from torchmetrics import Accuracy, Precision, Recall, F1Score, JaccardIndex, ConfusionMatrix
 
 from sarfusion.utils import TryExcept, threaded
 
@@ -397,6 +397,27 @@ def plot_mc_curve(px, py, save_dir=Path('mc_curve.png'), names=(), xlabel='Confi
     ax.set_title(f'{ylabel}-Confidence Curve')
     fig.savefig(save_dir, dpi=250)
     plt.close(fig)
+    
+
+class MetricCollection(torch.nn.ModuleDict):
+    def __init__(self, metrics):
+        super().__init__()
+        for k, v in metrics.items():
+            self[k] = v
+        
+    def forward(self, *args, **kwargs):
+        return {name: metric(*args, **kwargs) for name, metric in self.items()}
+    
+    def compute(self, *args, **kwargs):
+        return {name: metric.compute() for name, metric in self.items()}
+    
+    def reset(self):
+        for metric in self.values():
+            metric.reset()
+            
+    def update(self, *args, **kwargs):
+        for metric in self.values():
+            metric.update(*args, **kwargs)
 
 
 def build_metrics(params):
