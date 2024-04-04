@@ -27,16 +27,14 @@ WANDB_INCLUDE_FILE_NAME = ".wandbinclude"
 
 
 def wandb_experiment(accelerator: Accelerator, params: dict):
-    logger_params = deepcopy(params.get("logger", {}))
-    wandb_params = logger_params.pop("wandb", {})
-    wandb_information = {
+    logger_params = deepcopy(params.get("tracker", {}))
+    wandb_params = {
         "accelerator": accelerator,
         "project_name": params["experiment"]["name"],
         "group": params["experiment"].get("group", None),
-        **wandb_params,
+        **logger_params,
     }
-
-    wandb_logger = WandBLogger(**wandb_information, **logger_params)
+    wandb_logger = WandBLogger(**wandb_params)
     wandb_logger.log_parameters(params)
     wandb_logger.add_tags(logger_params.get("tags", ()))
 
@@ -61,6 +59,7 @@ class WandBLogger(AbstractLogger):
         run_id=None,
         resume_checkpoint_type: str = "best",
         group=None,
+        ignored_files=None,
         **kwargs,
     ):
         """
@@ -93,6 +92,8 @@ class WandBLogger(AbstractLogger):
             os.environ["WANDB_CACHE_DIR"] = offline_directory
             os.environ["WANDB_CONFIG_DIR"] = offline_directory
             os.environ["WANDB_DATA_DIR"] = offline_directory
+        if ignored_files:
+            os.environ["WANDB_IGNORE_GLOBS"] = ignored_files
         if resume:
             self._resume(offline_directory, run_id, checkpoint_type=resume_checkpoint_type)
         experiment = None

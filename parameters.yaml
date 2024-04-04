@@ -14,15 +14,15 @@ parameters:
   seed: &seed [42] # random seed to set
 
   tracker:
-    output_dir: [wandb]
+    ignored_files: ["*.bin,*.safetensors"]
 
   train:
-    max_epochs: [5]
+    max_epochs: [2]
     compile: [False]
     initial_lr: [0.0001, 0.00005, 0.00001]
     optimizer: [AdamW]
     watch_metric: [F1Score]
-    freeze_backbone: [False, True]
+    freeze_backbone: [True, False]
   
   loss:
     name: [CrossEntropyLoss]
