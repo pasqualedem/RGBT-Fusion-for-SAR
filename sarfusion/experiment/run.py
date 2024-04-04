@@ -98,6 +98,7 @@ class Run:
         logger.info(f"Creating model {model_name}")
         self.model = build_model(params=self.model_params)
         self.watch_metric = self.train_params["watch_metric"]
+        self.greater_is_better = self.train_params.get("greater_is_better", True)
         logger.info("Creating criterion")
         self.criterion = build_loss(self.params["loss"])
         self.model = WrapperModule(self.model, self.criterion)
@@ -221,12 +222,17 @@ class Run:
         if self.test_loader:
             self.test()
         self.end()
+        
+    def _metric_is_better(self, metric):
+        if self.best_metric is None:
+            return True
+        if self.greater_is_better:
+            return metric > self.best_metric
+        return metric < self.best_metric
 
     def save_training_state(self, epoch, metrics=None):
         if metrics:
-            if self.best_metric is None:
-                self.best_metric = metrics[self.watch_metric]
-            if metrics[self.watch_metric] >= self.best_metric:
+            if self._metric_is_better(metrics[self.watch_metric]):
                 logger.info(
                     f"Saving best model with metric {metrics[self.watch_metric]} as given that metric is greater than {self.best_metric}"
                 )
@@ -442,12 +448,14 @@ class Run:
                 )
                 
                 self.global_val_step += 1
+                
+            metrics_dict = {
+                **self.val_metrics.compute(),
+                "loss": avg_loss.compute(),
+            }
 
             self.tracker.log_metrics(
-                {
-                    **{k: v for k, v in self.val_metrics.compute().items()},
-                    "avg_loss": avg_loss.compute(),
-                },
+                metrics=metrics_dict,
                 epoch=epoch,
             )
         self.accelerator.wait_for_everyone()
@@ -459,9 +467,7 @@ class Run:
             else:
                 logger.info(f"{phase} - {k}: {v}")
         logger.info(f"{phase} Loss: {avg_loss.compute()}")
-        return {
-            "loss": avg_loss.compute(),
-        }
+        return metrics_dict
 
     def test(self):
         self.test_loader = self.accelerator.prepare(self.test_loader)
