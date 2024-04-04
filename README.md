@@ -10,9 +10,22 @@ conda env create -f environment.yml
 
 https://drive.google.com/file/d/1PKjGCqUszHH1nMbXUBTwPSDqRabAt_ht
 
+##### Extract patches from the WiSARD dataset:
+
+```bash
+    unzip WiSARDv1.zip -d data/
+    
+
 
 #### Extract classification patches from the SARDATA dataset:
 
 ```bash
 python3 main.py preprocess_classification
 ```
+
+#### Train the pose classifier
+    
+```bash
+python3 main.py experiment --parameters="parameters/SARDPose.yaml"
+```
+

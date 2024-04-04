@@ -2,6 +2,7 @@ import os
 import sys
 import shutil
 from copy import deepcopy
+from safetensors import safe_open
 
 import torch
 
@@ -468,9 +469,17 @@ class Run:
                 logger.info(f"{phase} - {k}: {v}")
         logger.info(f"{phase} Loss: {avg_loss.compute()}")
         return metrics_dict
+    
+    def restore_best_model(self):
+        filename = self.tracker.local_dir + "/best/model.safetensors"
+        with safe_open(filename, framework="pt") as f:
+            weights = {k: f.get_tensor(k) for k in f.keys()}
+        self.model.load_state_dict(weights)
 
     def test(self):
         self.test_loader = self.accelerator.prepare(self.test_loader)
+        # Restore best model
+        self.restore_best_model()
         with self.tracker.test():
             self.evaluate(self.test_loader, phase="test")
 
