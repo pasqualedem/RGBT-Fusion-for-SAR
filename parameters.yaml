@@ -61,5 +61,8 @@ parameters:
     F1Score: *metric_params
     Precision: *metric_params
     Recall: *metric_params
+    ConfusionMatrix:
+      num_classes: [6]
+      task: [multiclass]
 
 other_grids:

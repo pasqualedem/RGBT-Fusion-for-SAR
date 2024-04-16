@@ -316,7 +316,8 @@ class Run:
         #         metric_value = torch.mean(self.accelerator.gather(metric_value))
         #         self.tracker.log_metric(metric_name, metric_value)
         # .item() to all values
-        metrics_dict = {k: v.item() for k, v in metrics_dict.items()}
+        metrics_dict = {k: v.item() if v.dim() == 0 else v
+                        for k, v in metrics_dict.items()}
         return metrics_dict
 
     def _update_val_metrics(
@@ -443,7 +444,6 @@ class Run:
                 avg_loss.update(loss.item())
                 bar.set_postfix(
                     {
-                        **metrics_value,
                         "loss": loss.item(),
                     }
                 )

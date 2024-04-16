@@ -426,9 +426,18 @@ class WandBLogger(AbstractLogger):
     @main_process_only
     def log_metric(self, name, metric, epoch=None):
         wandb.log({f"{self.context}/{name}": metric})
+        
+    @main_process_only
+    def log_confusion_matrix(self, cm, epoch=None):
+        title = f"{self.context}/Confusion Matrix"
+        table = wandb.Table(columns=[f"Actual {i}" for i in range(cm.shape[0])], data=cm.tolist(), rows=[f"Predicted {i}" for i in range(cm.shape[1])])
+        wandb.log({title: table})
 
     @main_process_only
     def log_metrics(self, metrics: dict, epoch=None):
+        if "ConfusionMatrix" in metrics:
+            self.log_confusion_matrix(metrics["ConfusionMatrix"], epoch)
+            metrics = {k: v for k, v in metrics.items() if k != "Confusion Matrix"}
         wandb.log({f"{self.context}/{k}": v for k, v in metrics.items()})
 
     def __repr__(self):
