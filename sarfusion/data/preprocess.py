@@ -5,6 +5,21 @@ from PIL import Image, ImageDraw
 
 from sarfusion.data.sard import YOLODataset, download_and_clean
 
+NO_LABELS = [
+    "210812_Hannegan_Enterprise_VIS_0055",
+    "210924_FHL_Enterprise_VIS_0564",
+    "210924_FHL_Enterprise_VIS_0566",
+    "210924_FHL_Enterprise_IR_0410",
+    "210924_FHL_Enterprise_VIS_0409",
+    "210812_Hannegan_Enterprise_IR_0056",
+    "210529_Carnation_Enterprise_IR_0026",
+    "210812_Hannegan_Enterprise_IR_0054",
+    "210812_Hannegan_Enterprise_VIS_0053",
+    "210924_FHL_Enterprise_VIS_0403",
+    "210924_FHL_Enterprise_IR_0408",
+    "210924_FHL_Enterprise_IR_0127",
+]
+
 
 def crop_bboxes(image, targets, crop_size=224):
     crop_width = crop_height = crop_size
@@ -55,3 +70,20 @@ def generate_pose_classification_dataset(output_dir):
                 cropped_image = cropped_image.mul(255).byte().permute(1, 2, 0).numpy()
                 cropped_image = Image.fromarray(cropped_image)
                 cropped_image.save(save_path)
+                
+                
+def wisard_to_yolo_dataset(root):
+    subfolders = [os.path.join(root, f) for f in os.listdir(root) if os.path.isdir(os.path.join(root, f))]
+    print(f"Found {len(subfolders)} subfolders.")
+    for subfolder in subfolders:
+        print(f"Processing {subfolder}...")
+        os.makedirs(f"{subfolder}/images", exist_ok=True)
+        os.makedirs(f"{subfolder}/labels", exist_ok=True)
+        for image in tqdm(os.listdir(subfolder)):
+            ext = os.path.splitext(image)[-1]
+            if ext.lower() in ['.jpg', '.jpeg', '.png']:
+                image_path = os.path.join(subfolder, image)
+                label_path = image_path.replace(ext, ".txt")
+                os.rename(image_path, f"{subfolder}/images/{image}")
+                if os.path.exists(label_path):
+                    os.rename(label_path, f"{subfolder}/labels/{image.replace(ext, '.txt')}") 

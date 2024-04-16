@@ -10,11 +10,12 @@ conda env create -f environment.yml
 
 https://drive.google.com/file/d/1PKjGCqUszHH1nMbXUBTwPSDqRabAt_ht
 
-##### Extract patches from the WiSARD dataset:
+##### Extract images from the WiSARD dataset and prepare it:
 
 ```bash
-    unzip WiSARDv1.zip -d data/
-    
+unzip WiSARDv1.zip -d dataset/WiSARD
+python3 main.py preprocess_wisard
+```
 
 
 #### Extract classification patches from the SARDATA dataset:

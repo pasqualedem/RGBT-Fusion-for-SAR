@@ -10,6 +10,12 @@ def main():
 def preprocess_classification(output_dir):
     from sarfusion.data.preprocess import generate_pose_classification_dataset
     generate_pose_classification_dataset(output_dir)
+ 
+
+@main.command("preprocess_wisard")
+def preprocess_wisard():
+    from sarfusion.data.preprocess import wisard_to_yolo_dataset
+    wisard_to_yolo_dataset("dataset/WiSARD")    
     
     
 @main.command("experiment")
