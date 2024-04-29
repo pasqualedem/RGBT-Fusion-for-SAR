@@ -43,6 +43,17 @@
             "args": [
                 "experiment"
             ]
-        }
+        },
+        {
+            "name": "Annotate Wisard",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "annotate_wisard"
+            ]
+        },
     ]
 }

@@ -119,16 +119,21 @@ def nosync_accumulation(accumulate=False, accelerator=None, model=None):
 
 
 class WrapperModule(torch.nn.Module):
-    def __init__(self, model, loss) -> None:
+    def __init__(self, model, loss=None) -> None:
         super().__init__()
         self.model = model
         self.loss = loss
 
     def forward(self, input_dict):
-        gt = input_dict[DataDict.TARGET]
-        input_dict = {k: v for k, v in input_dict.items() if k != DataDict.TARGET}
+        if DataDict.TARGET in input_dict:
+            gt = input_dict[DataDict.TARGET]
+            input_dict = {k: v for k, v in input_dict.items() if k != DataDict.TARGET}
         result_dict = self.model(**input_dict)
-        loss = self.loss(result_dict.logits, gt)
+        
+        loss = None
+        if DataDict.TARGET in input_dict and self.loss is not None:
+            loss = self.loss(result_dict.logits, gt)
+            gt = input_dict[DataDict.TARGET]
         return {"loss": loss, **result_dict}
 
     def get_learnable_params(self, train_params):

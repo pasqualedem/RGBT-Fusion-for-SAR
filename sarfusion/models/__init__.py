@@ -1,14 +1,43 @@
 from copy import deepcopy
+from enum import StrEnum
 from transformers import AutoModel, ViTForImageClassification
+
+from sarfusion.experiment.utils import WrapperModule
+from sarfusion.models.utils import torch_dict_load
+from sarfusion.utils.utils import load_yaml
+
+
+class AdditionalParams(StrEnum):
+    PRETRAINED_PATH = "pretrained_path"
 
 
 def build_model(params):
+    """
+    Build a model from a yaml file or a dictionary
+    
+    Args:
+        params (dict or str): Dictionary or path to yaml file containing model parameters
+        Additional parameters:
+            pretrained_path: The path of the pretrained model
+        
+    """
+    if isinstance(params, str):
+        params = load_yaml(params)
+    params = deepcopy(params)
     name = params["name"]
     params = params["params"]
+    pretrained_path = params.pop(AdditionalParams.PRETRAINED_PATH, None)
 
     if name in MODEL_REGISTRY:
-        return MODEL_REGISTRY[name](**params)
-    return AutoModel.from_pretrained(name)
+        model =  MODEL_REGISTRY[name](**params)
+    else:
+        model = AutoModel.from_pretrained(name)
+    model = WrapperModule(model)
+      
+    if pretrained_path:
+        model.load_state_dict(torch_dict_load(pretrained_path))
+        print(f"Loaded model from {pretrained_path}")
+    return model
 
 
 def backbone_learnable_params(self, train_params: dict):
@@ -18,6 +47,7 @@ def backbone_learnable_params(self, train_params: dict):
             param.requires_grad = False
         return [{"params": [x[1] for x in self.named_parameters() if x[1].requires_grad]}]
     return [{"params": list(self.parameters())}]
+
 
 def build_vit_classifier(**params):
     params = deepcopy(params)

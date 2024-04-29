@@ -30,3 +30,9 @@ python3 main.py preprocess_classification
 python3 main.py experiment --parameters="parameters/SARDPose.yaml"
 ```
 
+#### Annotate the WiSARD dataset with the pose classifier
+Move the pose classifier checkpoint to the `checkpoints` folder and run the following command:
+
+```bash
+python3 main.py annotate_wisard
+```

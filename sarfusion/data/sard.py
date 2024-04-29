@@ -30,13 +30,17 @@ def download_and_clean():
 
 
 class YOLODataset(Dataset):
-    def __init__(self, root, transform=None):
+    def __init__(self, root, transform=None, return_path=False):
         image_path = os.path.join(root, "images")
         annotation_path = os.path.join(root, "labels")
         annotations = os.listdir(annotation_path)
-        self.annotation_paths = [os.path.join(annotation_path, ann) for ann in annotations]
-        self.image_paths = [os.path.join(image_path, ann.replace("txt", "jpg")) for ann in annotations]
+        images = os.listdir(image_path)
+        self.annotation_paths = sorted([os.path.join(annotation_path, ann) for ann in annotations])
+        self.image_paths = sorted([os.path.join(image_path, img) for img in images])
+        for i in range(len(self.annotation_paths)):
+            assert self.annotation_paths[i].split("/")[-1].split(".")[0] == self.image_paths[i].split("/")[-1].split(".")[0]
         self.transform = transform
+        self.return_path = return_path
 
     def __len__(self):
         return len(self.image_paths)
@@ -62,14 +66,21 @@ class YOLODataset(Dataset):
 
         if self.transform:
             img = self.transform(img)
+        data_dict = {
+            DataDict.IMAGES: img,
+            DataDict.TARGET: targets
+        }
+        if self.return_path:
+            data_dict[DataDict.PATH] = img_path
 
-        return img, targets
+        return data_dict
     
     
 class PoseClassificationDataset(Dataset):
-    def __init__(self, root, transform=None):
+    def __init__(self, root, transform=None, return_path=False):
         self.image_paths = [os.path.join(root, img) for img in os.listdir(root)]
         self.transform = transform
+        self.return_path = return_path
         
     def __len__(self):
         return len(self.image_paths)
@@ -82,7 +93,11 @@ class PoseClassificationDataset(Dataset):
         if self.transform:
             img = self.transform(img)
         
-        return {
+        data_dict = {
             DataDict.IMAGES: img,
             DataDict.TARGET: cls
         }
+        if self.return_path:
+            data_dict[DataDict.PATH] = img_path
+            
+        return data_dict

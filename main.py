@@ -15,7 +15,14 @@ def preprocess_classification(output_dir):
 @main.command("preprocess_wisard")
 def preprocess_wisard():
     from sarfusion.data.preprocess import wisard_to_yolo_dataset
-    wisard_to_yolo_dataset("dataset/WiSARD")    
+    wisard_to_yolo_dataset("dataset/WiSARD")
+    
+@main.command("annotate_wisard")
+@click.option("--model-yaml", type=str, help="Path to the model yaml file", default="parameters/WiSARD_pose/parameters.yaml")
+def annotate_wisard(model_yaml):
+    from sarfusion.data.preprocess import annotate_rgb_wisard
+    root = "dataset/WiSARD"
+    annotate_rgb_wisard(root, model_yaml)
     
     
 @main.command("experiment")
@@ -43,7 +50,6 @@ def experiment(parameters, parallel, only_create):
 def run(parameters):
     from sarfusion.experiment.experiment import run as run_single
     run_single(param_path=parameters)
-    
     
 if __name__ == "__main__":
     main()

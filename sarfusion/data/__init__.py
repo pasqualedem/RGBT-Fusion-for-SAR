@@ -1,30 +1,15 @@
 import os
 import torch
-import torchvision.transforms as T
 
-from transformers import AutoProcessor
 
 from sarfusion.data.sard import PoseClassificationDataset
-from sarfusion.data.utils import DataDict, dict_collate_fn
+from sarfusion.data.utils import dict_collate_fn
+from sarfusion.data.utils import build_preprocessor
 
 
 DATASET_REGISTRY = {
     "sard_pose": PoseClassificationDataset,
 }
-
-
-def build_preprocessor(params):
-    preprocessor_params = params.pop("preprocessor")
-    if "path" in preprocessor_params:
-        auto_processor =  AutoProcessor.from_pretrained(preprocessor_params["path"])
-        return T.Compose([
-            auto_processor,
-            lambda x: x[DataDict.IMAGES][0],
-            lambda x: torch.tensor(x)
-        ])
-    return T.Compose([
-        T.Normalize(mean=preprocessor_params["mean"], std=preprocessor_params["std"]),
-    ])
 
 
 def get_dataloaders(dataset_params, dataloader_params):

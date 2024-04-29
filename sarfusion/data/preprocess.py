@@ -1,24 +1,14 @@
 import os
+import accelerate
 from tqdm import tqdm
 from torchvision import transforms
 from PIL import Image, ImageDraw
 
 from sarfusion.data.sard import YOLODataset, download_and_clean
-
-NO_LABELS = [
-    "210812_Hannegan_Enterprise_VIS_0055",
-    "210924_FHL_Enterprise_VIS_0564",
-    "210924_FHL_Enterprise_VIS_0566",
-    "210924_FHL_Enterprise_IR_0410",
-    "210924_FHL_Enterprise_VIS_0409",
-    "210812_Hannegan_Enterprise_IR_0056",
-    "210529_Carnation_Enterprise_IR_0026",
-    "210812_Hannegan_Enterprise_IR_0054",
-    "210812_Hannegan_Enterprise_VIS_0053",
-    "210924_FHL_Enterprise_VIS_0403",
-    "210924_FHL_Enterprise_IR_0408",
-    "210924_FHL_Enterprise_IR_0127",
-]
+from sarfusion.data.utils import DataDict, build_preprocessor, is_annotation_valid
+from sarfusion.data.wisard import MISSING_ANNOTATIONS, VIS, IR, VIS_IR
+from sarfusion.models import build_model
+from sarfusion.utils.utils import ResultDict, load_yaml
 
 
 def crop_bboxes(image, targets, crop_size=224):
@@ -38,7 +28,19 @@ def crop_bboxes(image, targets, crop_size=224):
         xmin = round(bbox_center_x - crop_width / 2)
         xmax = round(bbox_center_x + crop_width / 2)
         ymin = round(bbox_center_y - crop_height / 2)
-        ymax = round(bbox_center_y + crop_height / 2)        
+        ymax = round(bbox_center_y + crop_height / 2)
+        
+        # Fix precision errors
+        if xmax - xmin != crop_width:
+            if (xmax - xmin) < crop_width:
+                xmax += 1
+            else:
+                xmin += 1
+        if ymax - ymin != crop_height:
+            if (ymax - ymin) < crop_height:
+                ymax += 1
+            else:
+                ymin += 1
         
         # Crop the image
         cropped_image = image[:, ymin:ymax, xmin:xmax]        
@@ -63,13 +65,74 @@ def generate_pose_classification_dataset(output_dir):
         
         bar = tqdm(dataset, total=len(dataset))
         
-        for i, (image, targets) in enumerate(bar):
+        for i, data_dict in enumerate(bar):
+            image = data_dict[DataDict.IMAGES]
+            targets = data_dict[DataDict.TARGET]
             cropped_images = crop_bboxes(image, targets)
             for j, (cropped_image, class_label) in enumerate(cropped_images):
                 save_path = f"{output_dir}/{subset}/{i}_{j}_{class_label}.png"
                 cropped_image = cropped_image.mul(255).byte().permute(1, 2, 0).numpy()
                 cropped_image = Image.fromarray(cropped_image)
                 cropped_image.save(save_path)
+                
+                
+def annotate_rgb_wisard(root, model_yaml):
+    accelerator = accelerate.Accelerator()
+    vis = VIS + [f[0] for f in VIS_IR]
+    params = load_yaml(model_yaml)
+    model_params = params["model"]
+    model = build_model(model_params)
+    model.eval()
+    model = accelerator.prepare(model)
+    transform = build_preprocessor(params)
+    
+    
+    print ("Placing -1 in all labels...")
+    # Place -1 in all labels
+    for subset in tqdm(os.listdir(root)):
+        subset_location = f"{root}/{subset}"
+        label_path = f"{subset_location}/labels"
+        for label_file in os.listdir(label_path):
+            with open(f"{label_path}/{label_file}", 'r') as file:
+                lines = file.readlines()
+            for i in range(len(lines)):
+                row = lines[i].split(" ")
+                row[0] = '-1'
+                lines[i] = " ".join(row) 
+            with open(f"{label_path}/{label_file}", 'w') as file:
+                file.writelines(lines)
+        
+    for subset in vis:
+        print(f"Processing {subset}...")
+        subset_location = f"{root}/{subset}"        
+
+        dataset = YOLODataset(subset_location, transform=transform, return_path=True)
+        
+        bar = tqdm(dataset, total=len(dataset))
+        
+        for i, data_dict in enumerate(bar):
+            image = data_dict[DataDict.IMAGES]
+            targets = data_dict[DataDict.TARGET]
+            path = data_dict[DataDict.PATH]
+            cropped_images = crop_bboxes(image, targets)
+            new_targets = []
+            for (cropped_image, _), target in zip(cropped_images, targets):
+                # Check if the annotation is valid
+                if not is_annotation_valid(target):
+                    print(f"Invalid annotation in {path}, {target}")
+                    continue
+                input_dict = {DataDict.IMAGES: cropped_image.unsqueeze(0).to(accelerator.device)}
+                result = model(input_dict)
+                class_label = result[ResultDict.LOGITS].argmax().item()
+                new_targets.append((class_label, *target[1:]))
+            # Replace the target file with the new one
+            gt_path = path.replace("images", "labels")
+            gt_path, ext = os.path.splitext(gt_path)
+            gt_path += ".txt"
+            with open(gt_path, 'w') as file:
+                for target in new_targets:
+                    file.write(" ".join(map(str, target)) + "\n")
+            
                 
                 
 def wisard_to_yolo_dataset(root):
@@ -87,3 +150,7 @@ def wisard_to_yolo_dataset(root):
                 os.rename(image_path, f"{subfolder}/images/{image}")
                 if os.path.exists(label_path):
                     os.rename(label_path, f"{subfolder}/labels/{image.replace(ext, '.txt')}") 
+    for annotation in MISSING_ANNOTATIONS:
+        print(f"Creating missing annotation {annotation}...")
+        with open(f"{root}/{annotation}", 'w') as file:
+            pass
