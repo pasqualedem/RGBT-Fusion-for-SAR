@@ -36,3 +36,10 @@ Move the pose classifier checkpoint to the `checkpoints` folder and run the foll
 ```bash
 python3 main.py annotate_wisard
 ```
+
+
+#### Download YoloV9 weights:
+
+```bash
+wget https://github.com/WongKinYiu/yolov9/releases/download/v0.1/yolov9-c-converted.pt -O checkpoints/yolov9-c-converted.pt
+```
