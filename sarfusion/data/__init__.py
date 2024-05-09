@@ -5,10 +5,12 @@ import torch
 from sarfusion.data.sard import PoseClassificationDataset
 from sarfusion.data.utils import dict_collate_fn
 from sarfusion.data.utils import build_preprocessor
+from sarfusion.data.wisard import WiSARDDataset
 
 
 DATASET_REGISTRY = {
     "sard_pose": PoseClassificationDataset,
+    "wisard": WiSARDDataset
 }
 
 

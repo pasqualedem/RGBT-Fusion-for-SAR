@@ -12,6 +12,7 @@ from torch.optim import AdamW
 from torchmetrics import MetricCollection
 from tqdm import tqdm
 
+from sarfusion.models.utils import WrapperModelOutput
 from sarfusion.utils.logger import get_logger
 from sarfusion.data import get_dataloaders
 from sarfusion.data.utils import DataDict
@@ -101,7 +102,7 @@ class Run:
         self.watch_metric = self.train_params["watch_metric"]
         self.greater_is_better = self.train_params.get("greater_is_better", True)
         logger.info("Creating criterion")
-        self.criterion = build_loss(self.params["loss"])
+        self.criterion = build_loss(self.params["loss"], model=self.model)
         self.model = WrapperModule(self.model, self.criterion)
 
         if self.train_params.get("compile", False):
@@ -282,9 +283,8 @@ class Run:
             raise e
         return outputs
 
-    def _backward(self, batch_idx, input_dict, outputs, loss_normalizer):
-        # loss_dict = compose_loss_input(input_dict, outputs)
-        loss = outputs["loss"] / loss_normalizer
+    def _backward(self, batch_idx, input_dict, outputs: ResultDict, loss_normalizer):
+        loss = outputs.loss.value / loss_normalizer
         self.accelerator.backward(loss)
         check_nan(
             self.model,
@@ -368,9 +368,9 @@ class Run:
 
         for batch_idx, batch_dict in bar:
             self.optimizer.zero_grad()
-            result_dict = self._forward(batch_dict, epoch, batch_idx)
+            result_dict: WrapperModelOutput = self._forward(batch_dict, epoch, batch_idx)
             loss = self._backward(batch_idx, batch_dict, result_dict, loss_normalizer)
-            outputs = result_dict[ResultDict.LOGITS]
+            outputs = result_dict.logits
             preds = outputs.argmax(dim=1)
             self.optimizer.step()
             self._scheduler_step(SchedulerStepMoment.BATCH)
@@ -380,7 +380,7 @@ class Run:
 
             metric_values = self._update_train_metrics(
                 preds,
-                batch_dict[DataDict.TARGET],
+                batch_dict.target,
                 tot_steps,
                 batch_idx,
             )

@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from sarfusion.models.utils import LossOutput
 from sarfusion.utils.general import xywh2xyxy
 from sarfusion.utils.metrics import bbox_iou
 from sarfusion.utils.tal.anchor_generator import dist2bbox, make_anchors, bbox2dist
@@ -248,7 +249,7 @@ class ComputeLoss:
         loss[1] *= 0.5  # cls gain
         loss[2] *= 1.5  # dfl gain
 
-        return loss.sum() * batch_size, loss.detach()  # loss(box, cls, dfl)
+        return LossOutput(value=loss.sum() * batch_size, components=loss.detach())  # loss(box, cls, dfl)
 
 
 class ComputeLossLH:
