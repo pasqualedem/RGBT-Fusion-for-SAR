@@ -19,32 +19,26 @@ parameters:
   train:
     max_epochs: [50]
     compile: [False]
-    initial_lr: [0.0001, 0.00005, 0.00001]
+    initial_lr: [0.0001]
     optimizer: [AdamW]
     watch_metric: [F1Score]
-    freeze_backbone: [True, False]
   
   loss:
-    name: [CrossEntropyLoss]
+    name: [YoloLoss]
     params:
+    requires_model: [True]
   
   model:
-    name: [vit_classifier]
+    name: [yolov9]
     params:
-      path: &model_path [google/vit-base-patch16-224]
-      labels: 
-        - - running
-          - walking
-          - laying_down
-          - not_defined
-          - seated
-          - stands
+      cfg: [cfg/yolov9-c.yaml]
+      checkpoint: [checkpoints/yolov9-c-converted.pt]
 
   dataset: # parameters depending on the class you defined for the dataset
-    name: [sard_pose] 
-    root: [dataset/sard_pose]
+    name: [wisard] 
+    root: [dataset/WiSARD]
     preprocessor:
-      path: *model_path
+      
 
   dataloader:
     num_workers: [0]

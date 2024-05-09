@@ -4,6 +4,17 @@ import click
 def main():
     pass
 
+@main.command("download_wisard")
+def download_wisard():
+    import gdown
+    output = "dataset/WiSARD.zip"
+    file_id = "1PKjGCqUszHH1nMbXUBTwPSDqRabAt_ht"
+    gdown.download(
+        f"https://drive.google.com/file/d/{file_id}/view?usp=sharing",
+        output,
+        fuzzy=True,
+    )
+
 
 @main.command("preprocess_classification")
 @click.option("--output-dir", type=str, required=True, help="Path to the output directory", default="dataset/sard_pose")

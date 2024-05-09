@@ -4,7 +4,7 @@ from roboflow import Roboflow
 from PIL import Image
 from torch.utils.data import Dataset
 
-from sarfusion.data.utils import DataDict
+from sarfusion.data.utils import DataDict, load_annotations, process_image_annotation_folders
 
 
 def download_and_clean():
@@ -31,14 +31,7 @@ def download_and_clean():
 
 class YOLODataset(Dataset):
     def __init__(self, root, transform=None, return_path=False):
-        image_path = os.path.join(root, "images")
-        annotation_path = os.path.join(root, "labels")
-        annotations = os.listdir(annotation_path)
-        images = os.listdir(image_path)
-        self.annotation_paths = sorted([os.path.join(annotation_path, ann) for ann in annotations])
-        self.image_paths = sorted([os.path.join(image_path, img) for img in images])
-        for i in range(len(self.annotation_paths)):
-            assert self.annotation_paths[i].split("/")[-1].split(".")[0] == self.image_paths[i].split("/")[-1].split(".")[0]
+        self.annotation_paths, self.image_paths = process_image_annotation_folders(root)
         self.transform = transform
         self.return_path = return_path
 
@@ -53,25 +46,17 @@ class YOLODataset(Dataset):
         img = Image.open(img_path).convert("RGB")
         
         # Load annotations
-        with open(annotation_path, 'r') as file:
-            annotations = file.readlines()
-        
-        # Parse annotations
-        targets = []
-        for annotation in annotations:
-            annotation = annotation.strip().split()
-            class_label = int(annotation[0])
-            x_center, y_center, width, height = map(float, annotation[1:])
-            targets.append([class_label, x_center, y_center, width, height])
+        targets = load_annotations(annotation_path)
 
         if self.transform:
             img = self.transform(img)
-        data_dict = {
-            DataDict.IMAGES: img,
-            DataDict.TARGET: targets
-        }
+        data_dict = DataDict(
+            images=img,
+            target=targets
+        )
+        
         if self.return_path:
-            data_dict[DataDict.PATH] = img_path
+            data_dict.path = img_path
 
         return data_dict
     

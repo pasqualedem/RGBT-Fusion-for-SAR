@@ -1,15 +1,16 @@
 from copy import deepcopy
-from enum import StrEnum
+from easydict import EasyDict
+import os
 
 import torch
 import torchvision.transforms as T
 from transformers import AutoProcessor
 
 
-class DataDict(StrEnum):
-    IMAGES = "pixel_values"
-    TARGET = "label"    
-    PATH = "path"
+class DataDict(EasyDict):
+    images: torch.Tensor
+    target: torch.Tensor
+    path: str
     
     
 def dict_collate_fn(batch):
@@ -44,4 +45,28 @@ def is_annotation_valid(annotation):
     bbox = annotation[1:]
     return all([0 <= x <= 1 for x in bbox])
     
-    
+
+def load_annotations(annotation_path):
+    with open(annotation_path, 'r') as file:
+        annotations = file.readlines()
+        
+    # Parse annotations
+    targets = []
+    for annotation in annotations:
+        annotation = annotation.strip().split()
+        class_label = int(annotation[0])
+        x_center, y_center, width, height = map(float, annotation[1:])
+        targets.append([class_label, x_center, y_center, width, height])
+    return targets
+
+
+def process_image_annotation_folders(root):
+    image_path = os.path.join(root, "images")
+    annotation_path = os.path.join(root, "labels")
+    annotations = os.listdir(annotation_path)
+    images = os.listdir(image_path)
+    annotation_paths = sorted([os.path.join(annotation_path, ann) for ann in annotations])
+    image_paths = sorted([os.path.join(image_path, img) for img in images])
+    for i in range(len(annotation_paths)):
+        assert annotation_paths[i].split("/")[-1].split(".")[0] == image_paths[i].split("/")[-1].split(".")[0]
+    return image_paths, annotation_paths

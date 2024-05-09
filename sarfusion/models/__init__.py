@@ -70,6 +70,13 @@ def build_vit_classifier(**params):
     return vit
 
 
+def build_yolo_v9(**params):
+    from sarfusion.models.yolo import Model as YOLOv9
+
+    return YOLOv9(**params)
+
+
 MODEL_REGISTRY = {
     "vit_classifier": build_vit_classifier,
+    "yolov9": build_yolo_v9,
 }
