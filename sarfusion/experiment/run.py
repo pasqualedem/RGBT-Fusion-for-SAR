@@ -367,11 +367,10 @@ class Run:
         metric_values = None
 
         for batch_idx, batch_dict in bar:
+            batch_dict = DataDict(**batch_dict)
             self.optimizer.zero_grad()
             result_dict: WrapperModelOutput = self._forward(batch_dict, epoch, batch_idx)
             loss = self._backward(batch_idx, batch_dict, result_dict, loss_normalizer)
-            outputs = result_dict.logits
-            preds = outputs.argmax(dim=1)
             self.optimizer.step()
             self._scheduler_step(SchedulerStepMoment.BATCH)
 
@@ -379,7 +378,7 @@ class Run:
             self.tracker.log_metric("loss", loss.item())
 
             metric_values = self._update_train_metrics(
-                preds,
+                result_dict,
                 batch_dict.target,
                 tot_steps,
                 batch_idx,

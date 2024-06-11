@@ -10,7 +10,15 @@ from transformers import AutoProcessor
 class DataDict(EasyDict):
     images: torch.Tensor
     target: torch.Tensor
+    dims: tuple
     path: str
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "images" not in self:
+            self.images = None
+        if "target" not in self:
+            self.target = None
     
     
 def dict_collate_fn(batch):
@@ -21,8 +29,18 @@ def dict_collate_fn(batch):
             d[key] = torch.stack([sample[key] for sample in batch])
         elif isinstance(batch[0][key], int) or isinstance(batch[0][key], float):
             d[key] = torch.stack([torch.tensor(sample[key]) for sample in batch])
+        elif isinstance(batch[0][key], list):
+            d[key] = [sample[key] for sample in batch]
+        else:
+            raise ValueError(f"Unsupported type {type(batch[0][key])}")
         
     return d
+
+
+def get_collate_fn(dataset):
+    if hasattr(dataset, "collate_fn"):
+        return dataset.collate_fn
+    return dict_collate_fn
 
 
 def build_preprocessor(params):
@@ -37,6 +55,7 @@ def build_preprocessor(params):
             lambda x: torch.tensor(x)
         ])
     return T.Compose([
+        T.ToTensor(),
         T.Normalize(mean=preprocessor_params["mean"], std=preprocessor_params["std"]),
     ])
     

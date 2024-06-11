@@ -855,7 +855,7 @@ class DetectionModel(BaseModel):
             s = 256  # 2x min stride
             m.inplace = self.inplace
             # forward = lambda x: self.forward(x)[0][0] if isinstance(m, (DualSegment, DualPanoptic)) else self.forward(x)[0]
-            forward = lambda x: self.forward(x)[0]
+            forward = lambda x: self.forward(x).features
             m.stride = torch.tensor(
                 [s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))]
             )  # forward
@@ -869,11 +869,11 @@ class DetectionModel(BaseModel):
         self.info()
         LOGGER.info("")
 
-    def forward(self, x, augment=False, profile=False, visualize=False):
+    def forward(self, images, augment=False, profile=False, visualize=False):
         if augment:
             return self._forward_augment(x)  # augmented inference, None
         return self._forward_once(
-            x, profile, visualize
+            images, profile, visualize
         )  # single-scale inference, train
 
     def _forward_augment(self, x):
@@ -922,6 +922,8 @@ class DetectionModel(BaseModel):
         y[-1] = y[-1][:, i:]  # small
         return y
 
+    def get_learnable_params(self, train_params):
+        return self.parameters()
 
 Model = DetectionModel  # retain YOLO 'Model' class for backwards compatibility
 

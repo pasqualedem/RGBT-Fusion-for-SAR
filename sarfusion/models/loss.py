@@ -1,23 +1,36 @@
+from copy import deepcopy
 import torch.nn as nn
-from utils.loss_tal_dual import ComputeLoss as YOLOLoss
+from sarfusion.experiment.utils import unwrap_model
+from sarfusion.utils.loss_tal_dual import ComputeLoss as YOLOLoss
 
 LOSS_REGISTRY = {
     "yolo_loss": YOLOLoss,
 }
 
+
+class TorchLossWrapper(nn.Module):
+    def __init__(self, loss):
+        super().__init__()
+        self.loss = loss
+
+    def forward(self, result_dict, target):
+        logits = result_dict.logits
+        return self.loss(logits, target)
+
+
 def build_loss(params, model=None):
     if not params:
         return None
-    
-    name = params['name']
-    params = params['params']
-    if params['requires_model']:
-        params['model'] = model
-    
+
+    name = params["name"]
+    params = deepcopy(params["params"])
+    if params.get("requires_model", False):
+        params.pop("requires_model")
+        params["model"] = unwrap_model(model)
+
     if name in LOSS_REGISTRY:
         return LOSS_REGISTRY[name](**params)
-    
     torch_losses = nn.__dict__
     if name in torch_losses:
-        return torch_losses[name](**params)
+        return TorchLossWrapper(torch_losses[name](**params))
     raise ValueError(f"Loss {name} not found in torch.nn or LOSS_REGISTRY")
