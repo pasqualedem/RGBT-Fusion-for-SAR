@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from sarfusion.models.utils import LossOutput
+from sarfusion.utils.structures import LossOutput
 from sarfusion.utils.general import xywh2xyxy
 from sarfusion.utils.metrics import bbox_iou
 from sarfusion.utils.tal.anchor_generator import dist2bbox, make_anchors, bbox2dist

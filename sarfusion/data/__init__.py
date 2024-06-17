@@ -64,7 +64,7 @@ def get_train_val_test_params(name, dataset_params):
 def get_dataloaders(dataset_params, dataloader_params):
     dataset_params = dataset_params.copy()
 
-    transforms = build_preprocessor(dataset_params)
+    transforms, denormalize = build_preprocessor(dataset_params)
 
     name = dataset_params.pop("name")
     dataclass = DATASET_REGISTRY[name]
@@ -103,4 +103,4 @@ def get_dataloaders(dataset_params, dataloader_params):
         **dataloader_params,
     )
 
-    return train_loader, val_loader, test_loader
+    return (train_loader, val_loader, test_loader), denormalize

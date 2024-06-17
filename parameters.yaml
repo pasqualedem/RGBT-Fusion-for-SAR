@@ -12,6 +12,7 @@ parameters:
   # Contains the parameters to build the grid.
   # Each value should be a dict or a list
   seed: &seed [42] # random seed to set
+  task: [detection] # task to perform
 
   tracker:
     ignored_files: ["*.bin,*.safetensors"]
@@ -34,14 +35,16 @@ parameters:
     name: [yolov9]
     params:
       cfg: [cfg/yolov9-c.yaml]
+      iou_t: [0.2]
+      conf_t: [0.001]
       # checkpoint: [checkpoints/yolov9-c-converted.pt]
 
   dataset: # parameters depending on the class you defined for the dataset
     name: [wisard] 
     root: [dataset/WiSARD]
     preprocessor:
-      mean: [0.485, 0.456, 0.406] 
-      std: [0.229, 0.224, 0.225]
+      mean: [[0.485, 0.456, 0.406]]
+      std: [[0.229, 0.224, 0.225]]
     folders: [vis]
     image_size: [640]
 

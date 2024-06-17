@@ -232,13 +232,6 @@ class RunningAverage:
         return self.accumulator / self.steps
 
 
-class ResultDict(StrEnum):
-    CLASS_EMBS = "class_embeddings"
-    LOGITS = "logits"
-    EXAMPLES_CLASS_EMBS = "class_examples_embeddings"
-    LOSS = "loss"
-
-
 def previous_iterator(some_iterable, return_first=True):
     prevs, items = tee(some_iterable, 2)
     prevs = chain([None], prevs)

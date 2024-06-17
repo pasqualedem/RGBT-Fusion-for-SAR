@@ -9,8 +9,8 @@ from accelerate import Accelerator
 from accelerate.logging import get_logger
 from transformers import get_scheduler as get_transformers_scheduler
 
-from sarfusion.data.utils import DataDict
-from sarfusion.models.utils import WrapperModelOutput
+from sarfusion.utils.structures import DataDict
+from sarfusion.utils.structures import WrapperModelOutput
 from sarfusion.tracker.abstract_tracker import AbstractLogger
 from sarfusion.utils.logger import get_logger
 

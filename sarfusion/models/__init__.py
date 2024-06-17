@@ -70,7 +70,7 @@ def build_vit_classifier(**params):
     return vit
 
 
-def build_yolo_v9(cfg, checkpoint=None):
+def build_yolo_v9(cfg, checkpoint=None, iou_t=0.2, conf_t=0.001):
     from sarfusion.models.yolo import Model as YOLOv9
     if checkpoint:
         return attempt_load(checkpoint)

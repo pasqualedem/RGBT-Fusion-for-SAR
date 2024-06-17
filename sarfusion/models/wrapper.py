@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from transformers.utils import ModelOutput
 
-from sarfusion.data.utils import DataDict
+from sarfusion.utils.structures import DataDict
 
 
 @dataclass

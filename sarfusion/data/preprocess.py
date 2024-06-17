@@ -5,10 +5,11 @@ from torchvision import transforms
 from PIL import Image, ImageDraw
 
 from sarfusion.data.sard import YOLODataset, download_and_clean
-from sarfusion.data.utils import DataDict, build_preprocessor, is_annotation_valid
+from sarfusion.data.utils import build_preprocessor, is_annotation_valid
 from sarfusion.data.wisard import MISSING_ANNOTATIONS, VIS, IR, VIS_IR
 from sarfusion.models import build_model
-from sarfusion.utils.utils import ResultDict, load_yaml
+from sarfusion.utils.structures import DataDict
+from sarfusion.utils.utils import load_yaml
 
 
 def crop_bboxes(image, targets, crop_size=224):
@@ -123,7 +124,7 @@ def annotate_rgb_wisard(root, model_yaml):
                     continue
                 input_dict = {DataDict.IMAGES: cropped_image.unsqueeze(0).to(accelerator.device)}
                 result = model(input_dict)
-                class_label = result[ResultDict.LOGITS].argmax().item()
+                class_label = result.logits.argmax().item()
                 new_targets.append((class_label, *target[1:]))
             # Replace the target file with the new one
             gt_path = path.replace("images", "labels")

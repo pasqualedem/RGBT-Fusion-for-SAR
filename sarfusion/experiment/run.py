@@ -12,16 +12,15 @@ from torch.optim import AdamW
 from torchmetrics import MetricCollection
 from tqdm import tqdm
 
-from sarfusion.models.utils import WrapperModelOutput
+from sarfusion.utils.structures import WrapperModelOutput
 from sarfusion.utils.logger import get_logger
 from sarfusion.data import get_dataloaders
-from sarfusion.data.utils import DataDict
+from sarfusion.utils.structures import DataDict
 from sarfusion.experiment.utils import WrapperModule
 from sarfusion.models.loss import build_loss
 from sarfusion.models import build_model
-from sarfusion.utils.metrics import build_metrics
+from sarfusion.utils.metrics import DetectionEvaluator, build_metrics
 from sarfusion.utils.utils import (
-    ResultDict,
     RunningAverage,
     write_yaml,
 )
@@ -42,7 +41,10 @@ logger = get_logger(__name__)
 class Run:
     def __init__(self):
         self.params = None
-        self.dataset = None
+        self.train_loader = None
+        self.val_loader = None
+        self.test_loader = None
+        self.denormalize = None
         self.experiment = None
         self.tracker = None
         self.dataset_params = None
@@ -53,6 +55,7 @@ class Run:
         self.best_metric = None
         self.scheduler_step_moment = None
         self.watch_metric = None
+        self.evaluator = None
         self.train_metrics: MetricCollection = None
         self.val_metrics: MetricCollection = None
         if "." not in sys.path:
@@ -92,9 +95,11 @@ class Run:
         self.tracker = get_experiment_tracker(self.accelerator, self.params)
         self.url = self.tracker.url
         self.name = self.tracker.name
-        self.train_loader, self.val_loader, self.test_loader = get_dataloaders(
-            self.dataset_params,
-            self.dataloader_params,
+        (self.train_loader, self.val_loader, self.test_loader), self.denormalize = (
+            get_dataloaders(
+                self.dataset_params,
+                self.dataloader_params,
+            )
         )
         model_name = self.model_params.get("name")
         logger.info(f"Creating model {model_name}")
@@ -104,6 +109,7 @@ class Run:
         logger.info("Creating criterion")
         self.criterion = build_loss(self.params["loss"], model=self.model)
         self.model = WrapperModule(self.model, self.criterion)
+        self.task = self.params.get("task", None)
 
         if self.train_params.get("compile", False):
             logger.info("Compiling model")
@@ -146,6 +152,8 @@ class Run:
     def _prep_for_validation(self):
         self.val_loader = self.accelerator.prepare(self.val_loader)
         self._init_metrics(self.params, phase="val")
+        if self.task == "detection":
+            self.evaluator = DetectionEvaluator(self.val_loader.dataset.id2class)
 
     def _load_state(self):
         if self.tracker.accelerator_state_dir:
@@ -224,7 +232,7 @@ class Run:
         if self.test_loader:
             self.test()
         self.end()
-        
+
     def _metric_is_better(self, metric):
         if self.best_metric is None:
             return True
@@ -283,7 +291,9 @@ class Run:
             raise e
         return outputs
 
-    def _backward(self, batch_idx, input_dict, outputs: ResultDict, loss_normalizer):
+    def _backward(
+        self, batch_idx, input_dict, outputs: WrapperModelOutput, loss_normalizer
+    ):
         loss = outputs.loss.value / loss_normalizer
         self.accelerator.backward(loss)
         check_nan(
@@ -316,18 +326,26 @@ class Run:
         #         metric_value = torch.mean(self.accelerator.gather(metric_value))
         #         self.tracker.log_metric(metric_name, metric_value)
         # .item() to all values
-        metrics_dict = {k: v.item() if v.dim() == 0 else v
-                        for k, v in metrics_dict.items()}
+        metrics_dict = {
+            k: v.item() if v.dim() == 0 else v for k, v in metrics_dict.items()
+        }
         return metrics_dict
 
     def _update_val_metrics(
         self,
-        preds: torch.tensor,
-        gt: torch.tensor,
+        batch_dict: DataDict,
+        result_dict: WrapperModelOutput,
         tot_steps,
     ):
+        preds = result_dict.logits.argmax(dim=1)
+        result_dict.predictions = preds
+        gt = batch_dict.target
         self.tracker.log_metric("step", self.global_val_step)
-        return self._update_metrics(self.val_metrics, preds, gt, tot_steps)
+        metrics = self._update_metrics(self.val_metrics, preds, gt, tot_steps) or {}
+        if self.evaluator:
+            m = self.evaluator.update(batch_dict, result_dict)
+            metrics = {**metrics, **m}
+        return metrics
 
     def _update_train_metrics(
         self,
@@ -337,9 +355,7 @@ class Run:
         step: int,
     ):
         self.tracker.log_metric("step", self.global_train_step)
-        metric_values = self._update_metrics(
-            self.train_metrics, preds, gt, tot_steps
-        )
+        metric_values = self._update_metrics(self.train_metrics, preds, gt, tot_steps)
         return metric_values
 
     def train_epoch(
@@ -367,9 +383,13 @@ class Run:
         metric_values = None
 
         for batch_idx, batch_dict in bar:
+            if batch_idx == 4:
+                break
             batch_dict = DataDict(**batch_dict)
             self.optimizer.zero_grad()
-            result_dict: WrapperModelOutput = self._forward(batch_dict, epoch, batch_idx)
+            result_dict: WrapperModelOutput = self._forward(
+                batch_dict, epoch, batch_idx
+            )
             loss = self._backward(batch_idx, batch_dict, result_dict, loss_normalizer)
             self.optimizer.step()
             self._scheduler_step(SchedulerStepMoment.BATCH)
@@ -431,24 +451,23 @@ class Run:
 
         with torch.no_grad():
             for batch_idx, batch_dict in bar:
-                result_dict = self.model(batch_dict)
-                outputs = result_dict[ResultDict.LOGITS]
-                preds = outputs.argmax(dim=1)
+                batch_dict = DataDict(**batch_dict)
+                result_dict: WrapperModelOutput = self.model(batch_dict)
 
                 metrics_value = self._update_val_metrics(
-                    preds, batch_dict[DataDict.TARGET], tot_steps
+                    batch_dict, result_dict, tot_steps
                 )
-                loss = result_dict["loss"]
-
-                avg_loss.update(loss.item())
+                loss = result_dict.loss.value.item()
+                avg_loss.update(loss)
                 bar.set_postfix(
                     {
-                        "loss": loss.item(),
+                        "loss": loss,
                     }
                 )
-                
+
                 self.global_val_step += 1
-                
+                self.log_predictions(batch_idx, batch_dict, result_dict, epoch)
+
             metrics_dict = {
                 **self.val_metrics.compute(),
                 "loss": avg_loss.compute(),
@@ -468,7 +487,18 @@ class Run:
                 logger.info(f"{phase} - {k}: {v}")
         logger.info(f"{phase} Loss: {avg_loss.compute()}")
         return metrics_dict
-    
+
+    def log_predictions(self, batch_idx, batch_dict, result_dict, epoch):
+        if self.task == "detection":
+            self.tracker.log_object_detection(
+                batch_idx,
+                batch_dict,
+                result_dict,
+                self.val_loader.dataset.id2class,
+                self.denormalize,
+                epoch,
+            )
+
     def restore_best_model(self):
         filename = self.tracker.local_dir + "/best/model.safetensors"
         with safe_open(filename, framework="pt") as f:

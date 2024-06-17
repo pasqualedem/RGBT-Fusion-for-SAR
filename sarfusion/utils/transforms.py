@@ -23,7 +23,10 @@ class ResizePadKeepRatio(Resize):
         resized = F.resize(img, (new_w, new_h), self.interpolation)
         if new_h == self.size:
             pad = self.size - new_w
-            return F.pad(resized, (0, 0, 0, pad))
+            img = F.pad(resized, (0, 0, 0, pad))
+            pad = (0, pad)
         else:
             pad = self.size - new_h
-            return F.pad(resized, (0, 0, pad, 0))
+            img = F.pad(resized, (0, 0, pad, 0))
+            pad = (pad, 0)
+        return img, (new_w / w, new_h / h), pad
