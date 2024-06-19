@@ -14,7 +14,7 @@ import wandb
 from PIL import Image
 from matplotlib import pyplot as plt
 from sarfusion.utils.general import xywh2xyxy
-from sarfusion.utils.structures import DataDict
+from sarfusion.utils.structures import DataDict, WrapperModelOutput
 from sarfusion.tracker.abstract_tracker import AbstractLogger, main_process_only
 
 from accelerate import Accelerator
@@ -447,7 +447,7 @@ class WandBLogger(AbstractLogger):
     def __repr__(self):
         return "WandbLogger"
     
-    def log_object_detection(self, batch_idx, data_dict: DataDict, result_dict, id2classes, denormalize, epoch):
+    def log_object_detection(self, batch_idx, data_dict: DataDict, result_dict: WrapperModelOutput, id2classes, denormalize, epoch):
         if not log_every_n(batch_idx, self.val_image_log_frequency):
             return
         images = data_dict.images
@@ -464,8 +464,8 @@ class WandBLogger(AbstractLogger):
                     class_id = cur_targets[k, 1].int().item()
                     label = id2classes[class_id]
                     box = xywh2xyxy(cur_targets[k, 2:])
-                    H = image.shape[1] - data_dict.dims[k][1][1][0]
-                    W = image.shape[2] - data_dict.dims[k][1][1][1]
+                    H = image.shape[1] - data_dict.dims[i][1][1][0]
+                    W = image.shape[2] - data_dict.dims[i][1][1][1]
                     box = (box * torch.tensor([H, W, H, W], device=box.device)).int().tolist()
                     box = {
                         "position": {
@@ -479,14 +479,15 @@ class WandBLogger(AbstractLogger):
                         "domain": "pixel",
                     }
                     gt_box_data.append(box)
-            if result_dict.predictions.numel() > 0:
-                for k in range(result_dict.predictions.shape[0]):
-                    class_id = result_dict.predictions[k, 4].int().item()
-                    conf = result_dict.predictions[k, 5].item()
+            if sum([pred.numel() for pred in result_dict.predictions]) > 0:
+                pred_elem = result_dict.predictions[i]
+                for k in range(pred_elem.shape[0]):
+                    class_id = pred_elem[k, 4].int().item()
+                    conf = pred_elem[k, 5].item()
                     label = id2classes[class_id]
-                    box = xywh2xyxy(result_dict.predictions[k, :4])
-                    H = image.shape[1] - data_dict.dims[k][1][1][0]
-                    W = image.shape[2] - data_dict.dims[k][1][1][1]
+                    box = xywh2xyxy(pred_elem[k, :4])
+                    H = image.shape[1] - data_dict.dims[i][1][1][0]
+                    W = image.shape[2] - data_dict.dims[i][1][1][1]
                     box = (box * torch.tensor([H, W, H, W], device=box.device)).int().tolist()
                     box = {
                         "position": {

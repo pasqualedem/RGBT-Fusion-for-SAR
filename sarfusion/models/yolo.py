@@ -367,7 +367,7 @@ class DualDDetect(nn.Module):
         return (
             ModelOutput(logits=y[0], logits_aux=y[1])
             if self.export
-            else ModelOutput(logits=y[0], logits_aux=y[1], features=d1, features_aux=d2)
+            else ModelOutput(logits=y, features=d1, features_aux=d2)
         )
         # y = torch.cat((dbox2, cls2.sigmoid()), 1)
         # return y if self.export else (y, d2)

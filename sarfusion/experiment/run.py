@@ -19,7 +19,7 @@ from sarfusion.utils.structures import DataDict
 from sarfusion.experiment.utils import WrapperModule
 from sarfusion.models.loss import build_loss
 from sarfusion.models import build_model
-from sarfusion.utils.metrics import DetectionEvaluator, build_metrics
+from sarfusion.utils.metrics import DetectionEvaluator, Evaluator, build_evaluator
 from sarfusion.utils.utils import (
     RunningAverage,
     write_yaml,
@@ -56,8 +56,8 @@ class Run:
         self.scheduler_step_moment = None
         self.watch_metric = None
         self.evaluator = None
-        self.train_metrics: MetricCollection = None
-        self.val_metrics: MetricCollection = None
+        self.train_evaluator: Evaluator = None
+        self.val_evaluator: Evaluator = None
         if "." not in sys.path:
             sys.path.extend(".")
         self.global_train_step = 0
@@ -144,16 +144,17 @@ class Run:
                 * len(self.train_loader),
             )
 
-        self.train_loader, self.optimizer, self.scheduler = self.accelerator.prepare(
-            self.train_loader, self.optimizer, self.scheduler
+        self.train_loader, self.optimizer = self.accelerator.prepare(
+            self.train_loader, self.optimizer
+        )
+        self.scheduler = (
+            self.accelerator.prepare(self.scheduler) if self.scheduler else None
         )
         self._init_metrics(self.params, phase="train")
 
     def _prep_for_validation(self):
         self.val_loader = self.accelerator.prepare(self.val_loader)
         self._init_metrics(self.params, phase="val")
-        if self.task == "detection":
-            self.evaluator = DetectionEvaluator(self.val_loader.dataset.id2class)
 
     def _load_state(self):
         if self.tracker.accelerator_state_dir:
@@ -307,27 +308,24 @@ class Run:
         return loss
 
     def _init_metrics(self, params, phase="train"):
-        metrics = params.get(f"{phase}_metrics", None)
-        metrics = build_metrics(metrics)
-        setattr(self, f"{phase}_metrics", self.accelerator.prepare(metrics))
+        evaluator = params.get(f"{phase}_metrics", None)
+        evaluator = build_evaluator(
+            evaluator, self.task, id2class=self.val_loader.dataset.id2class
+        )
+        setattr(self, f"{phase}_evaluator", self.accelerator.prepare(evaluator))
 
     def _update_metrics(
         self,
-        metrics: MetricCollection,
-        preds: torch.tensor,
-        gt: torch.tensor,
+        evaluator: MetricCollection,
+        batch_dict: DataDict,
+        result_dict: WrapperModelOutput,
         tot_steps: int,
     ):
-        with self.accelerator.no_sync(model=metrics):
-            metrics.update(preds, gt)
-            metrics_dict = metrics.compute()
-        # if tot_steps % self.tracker.log_frequency == 0:
-        #     for metric_name, metric_value in metrics_dict.items():
-        #         metric_value = torch.mean(self.accelerator.gather(metric_value))
-        #         self.tracker.log_metric(metric_name, metric_value)
-        # .item() to all values
+        with self.accelerator.no_sync(model=evaluator):
+            evaluator.update(batch_dict, result_dict)
+            metrics_dict = evaluator.compute()
         metrics_dict = {
-            k: v.item() if v.dim() == 0 else v for k, v in metrics_dict.items()
+            k: v.item() if isinstance(v, torch.Tensor) and v.dim() == 0 else v for k, v in metrics_dict.items()
         }
         return metrics_dict
 
@@ -337,11 +335,18 @@ class Run:
         result_dict: WrapperModelOutput,
         tot_steps,
     ):
-        preds = result_dict.logits.argmax(dim=1)
-        result_dict.predictions = preds
-        gt = batch_dict.target
+        result_dict.predictions = (
+            result_dict.logits.argmax(dim=1)
+            if self.task != "detection"
+            else result_dict.logits
+        )
         self.tracker.log_metric("step", self.global_val_step)
-        metrics = self._update_metrics(self.val_metrics, preds, gt, tot_steps) or {}
+        metrics = (
+            self._update_metrics(
+                self.val_evaluator, batch_dict, result_dict, tot_steps
+            )
+            or {}
+        )
         if self.evaluator:
             m = self.evaluator.update(batch_dict, result_dict)
             metrics = {**metrics, **m}
@@ -349,13 +354,13 @@ class Run:
 
     def _update_train_metrics(
         self,
-        preds: torch.tensor,
-        gt: torch,
+        result_dict: torch.tensor,
+        batch_dict: torch,
         tot_steps: int,
         step: int,
     ):
         self.tracker.log_metric("step", self.global_train_step)
-        metric_values = self._update_metrics(self.train_metrics, preds, gt, tot_steps)
+        metric_values = self._update_metrics(self.train_evaluator, batch_dict, result_dict, tot_steps)
         return metric_values
 
     def train_epoch(
@@ -367,7 +372,7 @@ class Run:
             logger.info(f"Setting seed to {self.params['seed'] + epoch}")
         self.tracker.log_metric("start_epoch", epoch)
         self.model.train()
-        self.train_metrics.reset()
+        self.train_evaluator.reset()
 
         loss_avg = RunningAverage()
         loss_normalizer = 1
@@ -397,7 +402,7 @@ class Run:
 
             metric_values = self._update_train_metrics(
                 result_dict,
-                batch_dict.target,
+                batch_dict,
                 tot_steps,
                 batch_idx,
             )
@@ -417,7 +422,7 @@ class Run:
         logger.info(f"Finished Epoch {epoch}")
         logger.info(f"Metrics")
         metric_dict = {
-            **self.train_metrics.compute(),
+            **self.train_evaluator.compute(),
             "avg_loss": loss_avg.compute(),
         }
         for k, v in metric_dict.items():
@@ -433,7 +438,7 @@ class Run:
 
     def evaluate(self, dataloader, epoch=None, phase="val"):
         self.model.eval()
-        self.val_metrics.reset()
+        self.val_evaluator.reset()
 
         avg_loss = RunningAverage()
 
@@ -467,7 +472,7 @@ class Run:
                 self.log_predictions(batch_idx, batch_dict, result_dict, epoch)
 
             metrics_dict = {
-                **self.val_metrics.compute(),
+                **self.val_evaluator.compute(),
                 "loss": avg_loss.compute(),
             }
 
@@ -477,7 +482,7 @@ class Run:
             )
         self.accelerator.wait_for_everyone()
 
-        metrics_value = self.val_metrics.compute()
+        metrics_value = self.val_evaluator.compute()
         for k, v in metrics_value.items():
             if epoch is not None:
                 logger.info(f"{phase} epoch {epoch} - {k}: {v}")

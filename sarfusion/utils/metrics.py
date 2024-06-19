@@ -411,6 +411,14 @@ def build_metrics(params):
     return metrics
 
 
+def build_evaluator(params, task='classification', **kwargs):
+    metrics = build_metrics(params)
+    if task == 'detection':
+        evaluator = DetectionEvaluator(metrics, **kwargs)
+    else:
+        evaluator = Evaluator(metrics)
+    return evaluator
+
 def process_batch(detections, labels, iouv):
     """
     Return correct prediction matrix.
@@ -437,15 +445,33 @@ def process_batch(detections, labels, iouv):
     return torch.tensor(correct, dtype=torch.bool, device=iouv.device)
 
 
-class DetectionEvaluator(Metric):
-    def __init__(self, id2classes):
-        nc = len(id2classes)
+class Evaluator(Metric):
+    def __init__(self, metrics):
+        super().__init__()
+        self.metrics = metrics
+
+    def update(self, *args, **kwargs):
+        return self.metrics.update(*args, **kwargs)
+        
+    def compute(self):
+        return self.metrics.compute()
+    
+    def reset(self):
+        return self.metrics.reset()
+
+
+class DetectionEvaluator(Evaluator):
+    def __init__(self, metrics, id2class):
+        super().__init__(metrics)
+        nc = len(id2class)
         self.confusion_matrix = DetectionConfusionMatrix(nc=nc)
         self.nc = nc
-        self.id2classes = id2classes
+        self.id2class = id2class
         self.stats = []
     
     def update(self, batch_dict: DataDict, result_dict: WrapperModelOutput):
+        if "logits" not in result_dict:
+            return {}
         preds = result_dict.logits
         targets = batch_dict.target
         dims = batch_dict.dims
@@ -476,16 +502,17 @@ class DetectionEvaluator(Metric):
                 labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
                 correct = process_batch(predn, labelsn, iouv)
             self.stats.append((correct, pred[:, 4], pred[:, 5], labels[:, 0]))  # (correct, conf, pcls, tcls)
+        self.metrics.update(preds, targets)
         return self.compute()
 
     def compute(self):
         # Compute metrics
         stats = [torch.cat(x, 0).cpu().numpy() for x in zip(*self.stats)]  # to numpy
         if len(stats) and stats[0].any():
-            tp, fp, p, r, f1, ap, ap_class = ap_per_class(*stats, names=self.id2classes.values())
+            tp, fp, p, r, f1, ap, ap_class = ap_per_class(*stats, names=self.id2class.values())
             ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
             mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
-            return {
+            metrics = {
                 'mAP': map,
                 'mAP50': map50,
                 'P': mp,
@@ -496,7 +523,7 @@ class DetectionEvaluator(Metric):
                 'AP_class': ap_class
             }
         else:
-            return {
+            metrics = {
                 'mAP': 0,
                 'mAP50': 0,
                 'P': 0,
@@ -506,4 +533,4 @@ class DetectionEvaluator(Metric):
                 'AP50': np.zeros(self.nc),
                 'AP_class': np.zeros(self.nc)
             }
-        # nt = np.bincount(stats[3].astype(int), minlength=self.nc)  # number of targets per class
+        return {**metrics, **self.metrics.compute()}
