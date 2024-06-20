@@ -1,5 +1,5 @@
 import torch.nn as nn
-from utils.loss_tal_dual import ComputeLoss as YOLOLoss
+from sarfusion.utils.loss_tal_dual import ComputeLoss as YOLOLoss
 
 LOSS_REGISTRY = {
     "yolo_loss": YOLOLoss,
