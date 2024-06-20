@@ -3,4 +3,4 @@
 conda init
 conda activate sarfusion
 export TMPDIR=./tmp
-python main.py run $@
+accelerate launch --multi_gpu --main_process_port 54345 main.py run $@
