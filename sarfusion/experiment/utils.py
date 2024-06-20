@@ -2,13 +2,15 @@ from enum import Enum
 import gc
 import contextlib
 from copy import deepcopy
+import inspect
 
 import torch
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from transformers import get_scheduler as get_transformers_scheduler
 
-from sarfusion.data.utils import DataDict
+from sarfusion.utils.structures import DataDict
+from sarfusion.utils.structures import WrapperModelOutput
 from sarfusion.tracker.abstract_tracker import AbstractLogger
 from sarfusion.utils.logger import get_logger
 
@@ -102,8 +104,6 @@ def handle_oom(model, input_dict, optimizer, epoch, step):
     )
     optimizer.zero_grad()
     del input_dict
-    del batch_tuple
-    del gt
     gc.collect()
     torch.cuda.empty_cache()
 
@@ -124,17 +124,15 @@ class WrapperModule(torch.nn.Module):
         self.model = model
         self.loss = loss
 
-    def forward(self, input_dict):
-        if DataDict.TARGET in input_dict:
-            gt = input_dict[DataDict.TARGET]
-            input_dict = {k: v for k, v in input_dict.items() if k != DataDict.TARGET}
-        result_dict = self.model(**input_dict)
+    def forward(self, input_dict: DataDict):
+        model_args = inspect.signature(self.model.forward).parameters
+        model_dict = {k: v for k, v in input_dict.items() if k in model_args}
+        result_dict = self.model(**model_dict)
         
         loss = None
-        if DataDict.TARGET in input_dict and self.loss is not None:
-            loss = self.loss(result_dict.logits, gt)
-            gt = input_dict[DataDict.TARGET]
-        return {"loss": loss, **result_dict}
+        if input_dict.target is not None and self.loss is not None:
+            loss = self.loss(result_dict, input_dict.target)
+        return WrapperModelOutput(loss=loss, **result_dict)
 
     def get_learnable_params(self, train_params):
         model_params = list(self.model.get_learnable_params(train_params))
@@ -142,11 +140,13 @@ class WrapperModule(torch.nn.Module):
         if len(loss_params) > 0:
             loss_params = [{"params": loss_params}]
         return model_params + loss_params
-    
-    @property
-    def class_embeddings(self):
-        return self.model.class_embeddings
+        
 
-    @class_embeddings.setter
-    def class_embeddings(self, value):
-        self.model.class_embeddings = value
+def unwrap_model(model):
+    if isinstance(model, WrapperModule):
+        return model.model
+    # Parallel
+    if isinstance(model, torch.nn.DataParallel):
+        model = model.module
+        return unwrap_model(model)
+    return model

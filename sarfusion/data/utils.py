@@ -1,18 +1,14 @@
 from copy import deepcopy
-from easydict import EasyDict
 import os
 
 import torch
 import torchvision.transforms as T
 from transformers import AutoProcessor
 
+from sarfusion.utils.augmentations import denormalize
+from sarfusion.utils.structures import DataDict
 
-class DataDict(EasyDict):
-    images: torch.Tensor
-    target: torch.Tensor
-    path: str
-    
-    
+
 def dict_collate_fn(batch):
     d = {}
     keys = batch[0].keys()
@@ -21,8 +17,18 @@ def dict_collate_fn(batch):
             d[key] = torch.stack([sample[key] for sample in batch])
         elif isinstance(batch[0][key], int) or isinstance(batch[0][key], float):
             d[key] = torch.stack([torch.tensor(sample[key]) for sample in batch])
-        
+        elif isinstance(batch[0][key], list):
+            d[key] = [sample[key] for sample in batch]
+        else:
+            raise ValueError(f"Unsupported type {type(batch[0][key])}")
+
     return d
+
+
+def get_collate_fn(dataset):
+    if hasattr(dataset, "collate_fn"):
+        return dataset.collate_fn
+    return dict_collate_fn
 
 
 def build_preprocessor(params):
@@ -30,26 +36,36 @@ def build_preprocessor(params):
     preprocessor_params = params.pop("preprocessor")
     if "path" in preprocessor_params:
         path = preprocessor_params["path"]
-        auto_processor =  AutoProcessor.from_pretrained(path, **preprocessor_params)
-        return T.Compose([
-            auto_processor,
-            lambda x: x[DataDict.IMAGES][0],
-            lambda x: torch.tensor(x)
-        ])
-    return T.Compose([
-        T.Normalize(mean=preprocessor_params["mean"], std=preprocessor_params["std"]),
-    ])
-    
-    
+        auto_processor = AutoProcessor.from_pretrained(path, **preprocessor_params)
+        return (
+            T.Compose(
+                [
+                    auto_processor,
+                    lambda x: x[DataDict.IMAGES][0],
+                    lambda x: torch.tensor(x),
+                ]
+            ),
+            lambda x: x,
+        )
+    return T.Compose(
+        [
+            T.ToTensor(),
+            T.Normalize(
+                mean=preprocessor_params["mean"], std=preprocessor_params["std"]
+            ),
+        ]
+    ), lambda x: denormalize(x, preprocessor_params["mean"], preprocessor_params["std"])
+
+
 def is_annotation_valid(annotation):
     bbox = annotation[1:]
     return all([0 <= x <= 1 for x in bbox])
-    
+
 
 def load_annotations(annotation_path):
-    with open(annotation_path, 'r') as file:
+    with open(annotation_path, "r") as file:
         annotations = file.readlines()
-        
+
     # Parse annotations
     targets = []
     for annotation in annotations:
@@ -65,8 +81,13 @@ def process_image_annotation_folders(root):
     annotation_path = os.path.join(root, "labels")
     annotations = os.listdir(annotation_path)
     images = os.listdir(image_path)
-    annotation_paths = sorted([os.path.join(annotation_path, ann) for ann in annotations])
+    annotation_paths = sorted(
+        [os.path.join(annotation_path, ann) for ann in annotations]
+    )
     image_paths = sorted([os.path.join(image_path, img) for img in images])
     for i in range(len(annotation_paths)):
-        assert annotation_paths[i].split("/")[-1].split(".")[0] == image_paths[i].split("/")[-1].split(".")[0]
+        assert (
+            annotation_paths[i].split("/")[-1].split(".")[0]
+            == image_paths[i].split("/")[-1].split(".")[0]
+        )
     return image_paths, annotation_paths

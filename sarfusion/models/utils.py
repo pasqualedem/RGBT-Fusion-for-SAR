@@ -1,6 +1,5 @@
 import torch
 
-from easydict import EasyDict
 
 from safetensors import safe_open
 from safetensors.torch import save_file
@@ -25,19 +24,3 @@ def torch_dict_save(data, file_path):
         save_file(data, file_path)
     else:
         raise ValueError("File extension not supported")
-    
-    
-class ModelOutput(EasyDict):
-    features: list[torch.Tensor]
-    features_aux: list[torch.Tensor]
-    logits: list[torch.Tensor]
-    logits_aux: list[torch.Tensor]
-
-
-class LossOutput(EasyDict):
-    value: torch.Tensor
-    components: dict
-    
-    
-class WrapperModelOutput(ModelOutput):
-    loss: LossOutput

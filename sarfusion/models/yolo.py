@@ -5,7 +5,7 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 
-from sarfusion.models.utils import ModelOutput
+from sarfusion.utils.structures import ModelOutput
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLO root directory
@@ -159,6 +159,15 @@ class DDetect(nn.Module):
         dbox = (
             dist2bbox(self.dfl(box), self.anchors.unsqueeze(0), xywh=True, dim=1)
             * self.strides
+        )
+        preds = non_max_suppression(
+            preds,
+            conf_thres,
+            iou_thres,
+            labels=lb,
+            multi_label=True,
+            agnostic=single_cls,
+            max_det=max_det,
         )
         y = torch.cat((dbox, cls.sigmoid()), 1)
         return y if self.export else (y, x)
@@ -354,10 +363,11 @@ class DualDDetect(nn.Module):
             * self.strides
         )
         y = [torch.cat((dbox, cls.sigmoid()), 1), torch.cat((dbox2, cls2.sigmoid()), 1)]
+        y = non_max_suppression(y, self.conf_t, self.iou_t, multi_label=True)
         return (
             ModelOutput(logits=y[0], logits_aux=y[1])
             if self.export
-            else ModelOutput(logits=y[0], logits_aux=y[1], features=d1, features_aux=d2)
+            else ModelOutput(logits=y, features=d1, features_aux=d2)
         )
         # y = torch.cat((dbox2, cls2.sigmoid()), 1)
         # return y if self.export else (y, d2)
@@ -808,7 +818,7 @@ class BaseModel(nn.Module):
 class DetectionModel(BaseModel):
     # YOLO detection model
     def __init__(
-        self, cfg="yolo.yaml", ch=3, nc=None, anchors=None
+        self, cfg="yolo.yaml", ch=3, nc=None, anchors=None, iou_t=0.20, conf_t=0.001
     ):  # model, input channels, number of classes
         super().__init__()
         if isinstance(cfg, dict):
@@ -819,6 +829,8 @@ class DetectionModel(BaseModel):
             self.yaml_file = Path(cfg).name
             with open(cfg, encoding="ascii", errors="ignore") as f:
                 self.yaml = yaml.safe_load(f)  # model dict
+        self.iou_t = iou_t  # IoU threshold
+        self.conf_t = conf_t  # confidence threshold
 
         # Define model
         ch = self.yaml["ch"] = self.yaml.get("ch", ch)  # input channels
@@ -836,6 +848,8 @@ class DetectionModel(BaseModel):
 
         # Build strides, anchors
         m = self.model[-1]  # Detect()
+        setattr(m, "iou_t", iou_t)
+        setattr(m, "conf_t", conf_t)
         if isinstance(m, (Detect, DDetect, Segment, Panoptic)):
             s = 256  # 2x min stride
             m.inplace = self.inplace
@@ -855,7 +869,7 @@ class DetectionModel(BaseModel):
             s = 256  # 2x min stride
             m.inplace = self.inplace
             # forward = lambda x: self.forward(x)[0][0] if isinstance(m, (DualSegment, DualPanoptic)) else self.forward(x)[0]
-            forward = lambda x: self.forward(x)[0]
+            forward = lambda x: self.forward(x).features
             m.stride = torch.tensor(
                 [s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))]
             )  # forward
@@ -869,11 +883,11 @@ class DetectionModel(BaseModel):
         self.info()
         LOGGER.info("")
 
-    def forward(self, x, augment=False, profile=False, visualize=False):
+    def forward(self, images, augment=False, profile=False, visualize=False):
         if augment:
-            return self._forward_augment(x)  # augmented inference, None
+            return self._forward_augment(images)  # augmented inference, None
         return self._forward_once(
-            x, profile, visualize
+            images, profile, visualize
         )  # single-scale inference, train
 
     def _forward_augment(self, x):
@@ -921,6 +935,9 @@ class DetectionModel(BaseModel):
         i = (y[-1].shape[1] // g) * sum(4 ** (nl - 1 - x) for x in range(e))  # indices
         y[-1] = y[-1][:, i:]  # small
         return y
+
+    def get_learnable_params(self, train_params):
+        return self.parameters()
 
 
 Model = DetectionModel  # retain YOLO 'Model' class for backwards compatibility

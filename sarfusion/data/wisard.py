@@ -6,10 +6,13 @@ import torch
 import torchvision.transforms.functional as tvF
 
 from sarfusion.data.utils import (
-    DataDict,
+    dict_collate_fn,
     load_annotations,
     process_image_annotation_folders,
 )
+from sarfusion.utils.augmentations import letterbox
+from sarfusion.utils.structures import DataDict
+from sarfusion.utils.transforms import ResizePadKeepRatio
 
 
 NO_LABELS = [
@@ -104,6 +107,34 @@ MISSING_ANNOTATIONS = [
     "210924_FHL_Enterprise_VIS_0126/labels/DJI_0126_00000212.txt",
 ]
 
+TRAIN_VIS = [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
+VAL_VIS = [0, 6, 7, 13, 14]
+TEST_VIS = [15, 16, 17, 18, 19, 20, 21]
+
+TRAIN_VIS_IR = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+VAL_VIS_IR = [3, 4, 5, 6]
+TEST_VIS_IR = [0, 1, 2]
+
+TRAIN_IR = [9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23]
+VAL_IR = [2, 3, 4, 5, 6, 7, 8]
+TEST_IR = [0, 1, 15]
+
+TRAIN_FOLDERS = (
+    [VIS[i] for i in TRAIN_VIS]
+    + [IR[i] for i in TRAIN_IR]
+    + [VIS_IR[i] for i in TRAIN_VIS_IR]
+)
+VAL_FOLDERS = (
+    [VIS[i] for i in VAL_VIS]
+    + [IR[i] for i in VAL_IR]
+    + [VIS_IR[i] for i in VAL_VIS_IR]
+)
+TEST_FOLDERS = (
+    [VIS[i] for i in TEST_VIS]
+    + [IR[i] for i in TEST_IR]
+    + [VIS_IR[i] for i in TEST_VIS_IR]
+)
+
 
 def collate_rgb_ir(rgb, ir):
     ir = ir[0:1]  # All channels are the same
@@ -120,10 +151,29 @@ def collate_rgb_ir(rgb, ir):
     return torch.cat((rgb, new_ir), dim=0)
 
 
+def get_wisard_folders(folders):
+    if folders == "vis":
+        folders = VIS
+    elif folders == "ir":
+        folders = IR
+    elif folders == "vis_ir":
+        folders = VIS_IR
+    return folders
+
+
 class WiSARDDataset(Dataset):
     RGB_ITEM = 0
     IR_ITEM = 1
     MULTI_MODALITY_ITEM = 2
+    
+    id2class = {
+        0: "running",
+        1: "walking",
+        2: "laying_down",
+        3: "not_defined",
+        4: "seated",
+        5: "stands",
+    }
 
     def __init__(
         self,
@@ -133,8 +183,9 @@ class WiSARDDataset(Dataset):
         ir_transform=None,
         return_path=False,
         augment=False,
-        img_size=640,
+        image_size=640,
     ):
+        folders = get_wisard_folders(folders)
         rgb_datasets = list(filter(lambda x: x in VIS, folders))
         ir_datasets = list(filter(lambda x: x in IR, folders))
         multi_modality_datasets = list(filter(lambda x: isinstance(x, tuple), folders))
@@ -165,9 +216,11 @@ class WiSARDDataset(Dataset):
         ]
 
         self.items = rgb_items + ir_items + multi_modality_items
+        if not self.items:
+            raise ValueError("No items found in dataset")
         self.transform = transform
         self.ir_transform = ir_transform
-        self.img_size = img_size
+        self.image_size = image_size
         self.augment = augment
         self.return_path = return_path
 
@@ -205,8 +258,28 @@ class WiSARDDataset(Dataset):
             targets = load_annotations(annotation_path)
             targets_ir = load_annotations(annotation_path_ir)
 
-        data_dict = DataDict(images=img, target=targets, targets_ir=targets_ir)
+        data_dict = DataDict(images=img, target=targets)
+        if self.image_size is not None:
+            dims = torch.tensor([img.size(1), img.size(2)])
+            data_dict.images, ratio, pad = ResizePadKeepRatio(self.image_size)(img)
+            data_dict.dims = dims, (ratio, pad)
         if self.return_path:
             data_dict.path = img_path_vis
 
         return data_dict
+
+    @classmethod
+    def collate_fn(cls, batch):
+        targets = [sample.target for sample in batch]
+        for d in batch:
+            del d["target"]
+        batch = dict_collate_fn(batch)
+        for i, target in enumerate(targets):
+            if len(target) == 0:
+                target = torch.zeros((0, 5))
+            target = torch.tensor(target)
+            image_index = torch.tensor([i for _ in range(target.size(0))]).unsqueeze(1)
+            targets[i] = torch.cat([image_index, target], dim=1)  # Add image index
+        targets = torch.cat(targets)
+        batch["target"] = targets
+        return batch

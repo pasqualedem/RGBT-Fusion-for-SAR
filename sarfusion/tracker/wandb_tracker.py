@@ -13,10 +13,12 @@ import torch
 import wandb
 from PIL import Image
 from matplotlib import pyplot as plt
+from sarfusion.utils.general import xywh2xyxy
+from sarfusion.utils.structures import DataDict, WrapperModelOutput
 from sarfusion.tracker.abstract_tracker import AbstractLogger, main_process_only
 
 from accelerate import Accelerator
-from sarfusion.utils.utils import write_yaml
+from sarfusion.utils.utils import log_every_n, write_yaml
 from sarfusion.utils.logger import get_logger
 
 
@@ -60,6 +62,7 @@ class WandBLogger(AbstractLogger):
         resume_checkpoint_type: str = "best",
         group=None,
         ignored_files=None,
+        val_image_log_frequency: int = 100,
         **kwargs,
     ):
         """
@@ -125,6 +128,7 @@ class WandBLogger(AbstractLogger):
         self.save_checkpoints_wandb = save_checkpoints_remote
         self.save_tensorboard_wandb = save_tensorboard_remote
         self.save_logs_wandb = save_logs_remote
+        self.val_image_log_frequency = val_image_log_frequency
         self.context = ""
         self.sequences = {}
                 
@@ -442,7 +446,94 @@ class WandBLogger(AbstractLogger):
 
     def __repr__(self):
         return "WandbLogger"
+    
+    def log_object_detection(self, batch_idx, data_dict: DataDict, result_dict: WrapperModelOutput, id2classes, denormalize, epoch):
+        if not log_every_n(batch_idx, self.val_image_log_frequency):
+            return
+        images = data_dict.images
+        targets = data_dict.target
+        sequence_name = f"object_detection"
+        self.create_image_sequence(sequence_name, columns=['epoch'])
 
+        for i in range(len(images)):               
+            image = denormalize(images[i])
+            gt_box_data = []
+            pred_box_data = []
+            cur_targets = targets[targets[:, 0] == i]
+            for k in range(cur_targets.shape[0]):
+                    class_id = cur_targets[k, 1].int().item()
+                    label = id2classes[class_id]
+                    box = xywh2xyxy(cur_targets[k, 2:])
+                    H = image.shape[1] - data_dict.dims[i][1][1][0]
+                    W = image.shape[2] - data_dict.dims[i][1][1][1]
+                    box = (box * torch.tensor([H, W, H, W], device=box.device)).int().tolist()
+                    box = {
+                        "position": {
+                            "minX": box[0],
+                            "minY": box[1],
+                            "maxX": box[2],
+                            "maxY": box[3],
+                        },
+                        "class_id": class_id,
+                        "box_caption": f"{label}",
+                        "domain": "pixel",
+                    }
+                    gt_box_data.append(box)
+            if sum([pred.numel() for pred in result_dict.predictions]) > 0:
+                pred_elem = result_dict.predictions[i]
+                for k in range(pred_elem.shape[0]):
+                    class_id = pred_elem[k, 4].int().item()
+                    conf = pred_elem[k, 5].item()
+                    label = id2classes[class_id]
+                    box = xywh2xyxy(pred_elem[k, :4])
+                    H = image.shape[1] - data_dict.dims[i][1][1][0]
+                    W = image.shape[2] - data_dict.dims[i][1][1][1]
+                    box = (box * torch.tensor([H, W, H, W], device=box.device)).int().tolist()
+                    box = {
+                        "position": {
+                            "minX": box[0],
+                            "minY": box[1],
+                            "maxX": box[2],
+                            "maxY": box[3],
+                        },
+                        "class_id": class_id,
+                        "box_caption": f"{label}_conf:{conf:.2f}",
+                        "domain": "pixel",
+                    }
+                    pred_box_data.append(box)
+
+            boxes = {}
+            if len(gt_box_data) > 0:
+                boxes["ground_truth"] = {
+                    "box_data": gt_box_data,
+                    "class_labels": id2classes,
+                }
+            if len(pred_box_data) > 0:
+                boxes["predictions"] = {
+                    "box_data": pred_box_data,
+                    "class_labels": id2classes,
+                }
+            boxes = None if len(boxes) == 0 else boxes
+
+            wandb_image = wandb.Image(
+                image,
+                boxes=boxes,
+                classes=[
+                    {"id": c, "name": name}
+                    for c, name in {
+                        **id2classes,
+                    }.items()
+                ],
+            )
+
+            self.add_image_to_sequence(
+                sequence_name,
+                f"image_{batch_idx}_sample_{i}",
+                wandb_image,
+                metadata=[epoch],
+                )
+        self.add_image_sequence(sequence_name)
+        
     @contextmanager
     def train(self):
         # Save the old context and set the new one

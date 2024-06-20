@@ -4,7 +4,8 @@ from roboflow import Roboflow
 from PIL import Image
 from torch.utils.data import Dataset
 
-from sarfusion.data.utils import DataDict, load_annotations, process_image_annotation_folders
+from sarfusion.data.utils import load_annotations, process_image_annotation_folders
+from sarfusion.utils.structures import DataDict
 
 
 def download_and_clean():

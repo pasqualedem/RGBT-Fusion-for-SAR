@@ -3,6 +3,7 @@ from enum import StrEnum
 from transformers import AutoModel, ViTForImageClassification
 
 from sarfusion.experiment.utils import WrapperModule
+from sarfusion.models.experimental import attempt_load
 from sarfusion.models.utils import torch_dict_load
 from sarfusion.utils.utils import load_yaml
 
@@ -32,7 +33,6 @@ def build_model(params):
         model =  MODEL_REGISTRY[name](**params)
     else:
         model = AutoModel.from_pretrained(name)
-    model = WrapperModule(model)
       
     if pretrained_path:
         model.load_state_dict(torch_dict_load(pretrained_path))
@@ -70,10 +70,11 @@ def build_vit_classifier(**params):
     return vit
 
 
-def build_yolo_v9(**params):
+def build_yolo_v9(cfg, checkpoint=None, iou_t=0.2, conf_t=0.001):
     from sarfusion.models.yolo import Model as YOLOv9
-
-    return YOLOv9(**params)
+    if checkpoint:
+        return attempt_load(checkpoint)
+    return YOLOv9(cfg)
 
 
 MODEL_REGISTRY = {

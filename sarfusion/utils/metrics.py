@@ -6,9 +6,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from torchmetrics import Accuracy, Precision, Recall, F1Score, JaccardIndex, ConfusionMatrix
+from torchmetrics import Accuracy, Metric, Precision, Recall, F1Score, JaccardIndex, ConfusionMatrix
 
+from sarfusion.utils.structures import DataDict
+from sarfusion.utils.structures import WrapperModelOutput
 from sarfusion.utils import TryExcept, threaded
+from sarfusion.utils.general import box_iou, scale_boxes, xywh2xyxy
 
 
 def fitness(x):
@@ -120,103 +123,103 @@ def compute_ap(recall, precision):
     return ap, mpre, mrec
 
 
-# class ConfusionMatrix:
-#     # Updated version of https://github.com/kaanakan/object_detection_confusion_matrix
-#     def __init__(self, nc, conf=0.25, iou_thres=0.45):
-#         self.matrix = np.zeros((nc + 1, nc + 1))
-#         self.nc = nc  # number of classes
-#         self.conf = conf
-#         self.iou_thres = iou_thres
+class DetectionConfusionMatrix:
+    # Updated version of https://github.com/kaanakan/object_detection_confusion_matrix
+    def __init__(self, nc, conf=0.25, iou_thres=0.45):
+        self.matrix = np.zeros((nc + 1, nc + 1))
+        self.nc = nc  # number of classes
+        self.conf = conf
+        self.iou_thres = iou_thres
 
-#     def process_batch(self, detections, labels):
-#         """
-#         Return intersection-over-union (Jaccard index) of boxes.
-#         Both sets of boxes are expected to be in (x1, y1, x2, y2) format.
-#         Arguments:
-#             detections (Array[N, 6]), x1, y1, x2, y2, conf, class
-#             labels (Array[M, 5]), class, x1, y1, x2, y2
-#         Returns:
-#             None, updates confusion matrix accordingly
-#         """
-#         if detections is None:
-#             gt_classes = labels.int()
-#             for gc in gt_classes:
-#                 self.matrix[self.nc, gc] += 1  # background FN
-#             return
+    def process_batch(self, detections, labels):
+        """
+        Return intersection-over-union (Jaccard index) of boxes.
+        Both sets of boxes are expected to be in (x1, y1, x2, y2) format.
+        Arguments:
+            detections (Array[N, 6]), x1, y1, x2, y2, conf, class
+            labels (Array[M, 5]), class, x1, y1, x2, y2
+        Returns:
+            None, updates confusion matrix accordingly
+        """
+        if detections is None:
+            gt_classes = labels.int()
+            for gc in gt_classes:
+                self.matrix[self.nc, gc] += 1  # background FN
+            return
 
-#         detections = detections[detections[:, 4] > self.conf]
-#         gt_classes = labels[:, 0].int()
-#         detection_classes = detections[:, 5].int()
-#         iou = box_iou(labels[:, 1:], detections[:, :4])
+        detections = detections[detections[:, 4] > self.conf]
+        gt_classes = labels[:, 0].int()
+        detection_classes = detections[:, 5].int()
+        iou = box_iou(labels[:, 1:], detections[:, :4])
 
-#         x = torch.where(iou > self.iou_thres)
-#         if x[0].shape[0]:
-#             matches = torch.cat((torch.stack(x, 1), iou[x[0], x[1]][:, None]), 1).cpu().numpy()
-#             if x[0].shape[0] > 1:
-#                 matches = matches[matches[:, 2].argsort()[::-1]]
-#                 matches = matches[np.unique(matches[:, 1], return_index=True)[1]]
-#                 matches = matches[matches[:, 2].argsort()[::-1]]
-#                 matches = matches[np.unique(matches[:, 0], return_index=True)[1]]
-#         else:
-#             matches = np.zeros((0, 3))
+        x = torch.where(iou > self.iou_thres)
+        if x[0].shape[0]:
+            matches = torch.cat((torch.stack(x, 1), iou[x[0], x[1]][:, None]), 1).cpu().numpy()
+            if x[0].shape[0] > 1:
+                matches = matches[matches[:, 2].argsort()[::-1]]
+                matches = matches[np.unique(matches[:, 1], return_index=True)[1]]
+                matches = matches[matches[:, 2].argsort()[::-1]]
+                matches = matches[np.unique(matches[:, 0], return_index=True)[1]]
+        else:
+            matches = np.zeros((0, 3))
 
-#         n = matches.shape[0] > 0
-#         m0, m1, _ = matches.transpose().astype(int)
-#         for i, gc in enumerate(gt_classes):
-#             j = m0 == i
-#             if n and sum(j) == 1:
-#                 self.matrix[detection_classes[m1[j]], gc] += 1  # correct
-#             else:
-#                 self.matrix[self.nc, gc] += 1  # true background
+        n = matches.shape[0] > 0
+        m0, m1, _ = matches.transpose().astype(int)
+        for i, gc in enumerate(gt_classes):
+            j = m0 == i
+            if n and sum(j) == 1:
+                self.matrix[detection_classes[m1[j]], gc] += 1  # correct
+            else:
+                self.matrix[self.nc, gc] += 1  # true background
 
-#         if n:
-#             for i, dc in enumerate(detection_classes):
-#                 if not any(m1 == i):
-#                     self.matrix[dc, self.nc] += 1  # predicted background
+        if n:
+            for i, dc in enumerate(detection_classes):
+                if not any(m1 == i):
+                    self.matrix[dc, self.nc] += 1  # predicted background
 
-#     def matrix(self):
-#         return self.matrix
+    def matrix(self):
+        return self.matrix
 
-#     def tp_fp(self):
-#         tp = self.matrix.diagonal()  # true positives
-#         fp = self.matrix.sum(1) - tp  # false positives
-#         # fn = self.matrix.sum(0) - tp  # false negatives (missed detections)
-#         return tp[:-1], fp[:-1]  # remove background class
+    def tp_fp(self):
+        tp = self.matrix.diagonal()  # true positives
+        fp = self.matrix.sum(1) - tp  # false positives
+        # fn = self.matrix.sum(0) - tp  # false negatives (missed detections)
+        return tp[:-1], fp[:-1]  # remove background class
 
-#     @TryExcept('WARNING ⚠️ ConfusionMatrix plot failure')
-#     def plot(self, normalize=True, save_dir='', names=()):
-#         import seaborn as sn
+    @TryExcept('WARNING ⚠️ ConfusionMatrix plot failure')
+    def plot(self, normalize=True, save_dir='', names=()):
+        import seaborn as sn
 
-#         array = self.matrix / ((self.matrix.sum(0).reshape(1, -1) + 1E-9) if normalize else 1)  # normalize columns
-#         array[array < 0.005] = np.nan  # don't annotate (would appear as 0.00)
+        array = self.matrix / ((self.matrix.sum(0).reshape(1, -1) + 1E-9) if normalize else 1)  # normalize columns
+        array[array < 0.005] = np.nan  # don't annotate (would appear as 0.00)
 
-#         fig, ax = plt.subplots(1, 1, figsize=(12, 9), tight_layout=True)
-#         nc, nn = self.nc, len(names)  # number of classes, names
-#         sn.set(font_scale=1.0 if nc < 50 else 0.8)  # for label size
-#         labels = (0 < nn < 99) and (nn == nc)  # apply names to ticklabels
-#         ticklabels = (names + ['background']) if labels else "auto"
-#         with warnings.catch_warnings():
-#             warnings.simplefilter('ignore')  # suppress empty matrix RuntimeWarning: All-NaN slice encountered
-#             sn.heatmap(array,
-#                        ax=ax,
-#                        annot=nc < 30,
-#                        annot_kws={
-#                            "size": 8},
-#                        cmap='Blues',
-#                        fmt='.2f',
-#                        square=True,
-#                        vmin=0.0,
-#                        xticklabels=ticklabels,
-#                        yticklabels=ticklabels).set_facecolor((1, 1, 1))
-#         ax.set_ylabel('True')
-#         ax.set_ylabel('Predicted')
-#         ax.set_title('Confusion Matrix')
-#         fig.savefig(Path(save_dir) / 'confusion_matrix.png', dpi=250)
-#         plt.close(fig)
+        fig, ax = plt.subplots(1, 1, figsize=(12, 9), tight_layout=True)
+        nc, nn = self.nc, len(names)  # number of classes, names
+        sn.set(font_scale=1.0 if nc < 50 else 0.8)  # for label size
+        labels = (0 < nn < 99) and (nn == nc)  # apply names to ticklabels
+        ticklabels = (names + ['background']) if labels else "auto"
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')  # suppress empty matrix RuntimeWarning: All-NaN slice encountered
+            sn.heatmap(array,
+                       ax=ax,
+                       annot=nc < 30,
+                       annot_kws={
+                           "size": 8},
+                       cmap='Blues',
+                       fmt='.2f',
+                       square=True,
+                       vmin=0.0,
+                       xticklabels=ticklabels,
+                       yticklabels=ticklabels).set_facecolor((1, 1, 1))
+        ax.set_ylabel('True')
+        ax.set_ylabel('Predicted')
+        ax.set_title('Confusion Matrix')
+        fig.savefig(Path(save_dir) / 'confusion_matrix.png', dpi=250)
+        plt.close(fig)
 
-#     def print(self):
-#         for i in range(self.nc + 1):
-#             print(' '.join(map(str, self.matrix[i])))
+    def print(self):
+        for i in range(self.nc + 1):
+            print(' '.join(map(str, self.matrix[i])))
             
 
 class WIoU_Scale:
@@ -297,27 +300,6 @@ def bbox_iou(box1, box2, xywh=True, GIoU=False, DIoU=False, CIoU=False, MDPIoU=F
         mpdiou_hw_pow = feat_h ** 2 + feat_w ** 2
         return iou - d1 / mpdiou_hw_pow - d2 / mpdiou_hw_pow  # MPDIoU
     return iou  # IoU
-
-
-def box_iou(box1, box2, eps=1e-7):
-    # https://github.com/pytorch/vision/blob/master/torchvision/ops/boxes.py
-    """
-    Return intersection-over-union (Jaccard index) of boxes.
-    Both sets of boxes are expected to be in (x1, y1, x2, y2) format.
-    Arguments:
-        box1 (Tensor[N, 4])
-        box2 (Tensor[M, 4])
-    Returns:
-        iou (Tensor[N, M]): the NxM matrix containing the pairwise
-            IoU values for every element in boxes1 and boxes2
-    """
-
-    # inter(N,M) = (rb(N,M,2) - lt(N,M,2)).clamp(0).prod(2)
-    (a1, a2), (b1, b2) = box1.unsqueeze(1).chunk(2, 2), box2.unsqueeze(0).chunk(2, 2)
-    inter = (torch.min(a2, b2) - torch.max(a1, b1)).clamp(0).prod(2)
-
-    # IoU = inter / (area1 + area2 - inter)
-    return inter / ((a2 - a1).prod(2) + (b2 - b1).prod(2) - inter + eps)
 
 
 def bbox_ioa(box1, box2, eps=1e-7):
@@ -427,3 +409,128 @@ def build_metrics(params):
         metrics[key] = metric
     metrics = MetricCollection(metrics)
     return metrics
+
+
+def build_evaluator(params, task='classification', **kwargs):
+    metrics = build_metrics(params)
+    if task == 'detection':
+        evaluator = DetectionEvaluator(metrics, **kwargs)
+    else:
+        evaluator = Evaluator(metrics)
+    return evaluator
+
+def process_batch(detections, labels, iouv):
+    """
+    Return correct prediction matrix.
+
+    Arguments:
+        detections (array[N, 6]), x1, y1, x2, y2, conf, class
+        labels (array[M, 5]), class, x1, y1, x2, y2
+    Returns:
+        correct (array[N, 10]), for 10 IoU levels
+    """
+    correct = np.zeros((detections.shape[0], iouv.shape[0])).astype(bool)
+    iou = box_iou(labels[:, 1:], detections[:, :4])
+    correct_class = labels[:, 0:1] == detections[:, 5]
+    for i in range(len(iouv)):
+        x = torch.where((iou >= iouv[i]) & correct_class)  # IoU > threshold and classes match
+        if x[0].shape[0]:
+            matches = torch.cat((torch.stack(x, 1), iou[x[0], x[1]][:, None]), 1).cpu().numpy()  # [label, detect, iou]
+            if x[0].shape[0] > 1:
+                matches = matches[matches[:, 2].argsort()[::-1]]
+                matches = matches[np.unique(matches[:, 1], return_index=True)[1]]
+                # matches = matches[matches[:, 2].argsort()[::-1]]
+                matches = matches[np.unique(matches[:, 0], return_index=True)[1]]
+            correct[matches[:, 1].astype(int), i] = True
+    return torch.tensor(correct, dtype=torch.bool, device=iouv.device)
+
+
+class Evaluator(Metric):
+    def __init__(self, metrics):
+        super().__init__()
+        self.metrics = metrics
+
+    def update(self, *args, **kwargs):
+        return self.metrics.update(*args, **kwargs)
+        
+    def compute(self):
+        return self.metrics.compute()
+    
+    def reset(self):
+        return self.metrics.reset()
+
+
+class DetectionEvaluator(Evaluator):
+    def __init__(self, metrics, id2class):
+        super().__init__(metrics)
+        nc = len(id2class)
+        self.confusion_matrix = DetectionConfusionMatrix(nc=nc)
+        self.nc = nc
+        self.id2class = id2class
+        self.stats = []
+    
+    def update(self, batch_dict: DataDict, result_dict: WrapperModelOutput):
+        if "logits" not in result_dict:
+            return {}
+        preds = result_dict.logits
+        targets = batch_dict.target
+        dims = batch_dict.dims
+        images = batch_dict.images
+        device = "cuda"
+        iouv = torch.linspace(0.5, 0.95, 10, device=device)  # iou vector for mAP@0.5:0.95
+        niou = iouv.numel()
+        # Metrics
+        for si, pred in enumerate(preds):
+            labels = targets[targets[:, 0] == si, 1:]
+            nl, npr = labels.shape[0], pred.shape[0]  # number of labels, predictions
+            shape = dims[si][0]
+            correct = torch.zeros(npr, niou, dtype=torch.bool, device=device)  # init
+
+            if npr == 0:
+                if nl:
+                    self.stats.append((correct, *torch.zeros((2, 0), device=device), labels[:, 0]))
+                continue
+
+            # Predictions
+            predn = pred.clone()
+            scale_boxes(images[si].shape[1:], predn[:, :4], shape, dims[si][1])  # native-space pred
+
+            # Evaluate
+            if nl:
+                tbox = xywh2xyxy(labels[:, 1:5])  # target boxes
+                scale_boxes(images[si].shape[1:], tbox, shape, dims[si][1])  # native-space labels
+                labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
+                correct = process_batch(predn, labelsn, iouv)
+            self.stats.append((correct, pred[:, 4], pred[:, 5], labels[:, 0]))  # (correct, conf, pcls, tcls)
+        self.metrics.update(preds, targets)
+        return self.compute()
+
+    def compute(self):
+        # Compute metrics
+        stats = [torch.cat(x, 0).cpu().numpy() for x in zip(*self.stats)]  # to numpy
+        if len(stats) and stats[0].any():
+            tp, fp, p, r, f1, ap, ap_class = ap_per_class(*stats, names=self.id2class.values())
+            ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
+            mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
+            metrics = {
+                'mAP': map,
+                'mAP50': map50,
+                'P': mp,
+                'R': mr,
+                'F1': 2 * mp * mr / (mp + mr),
+                'AP': ap,
+                'AP50': ap50,
+                'AP_class': ap_class
+            }
+        else:
+            metrics = {
+                'mAP': 0,
+                'mAP50': 0,
+                'P': 0,
+                'R': 0,
+                'F1': 0,
+                'AP': np.zeros(self.nc),
+                'AP50': np.zeros(self.nc),
+                'AP_class': np.zeros(self.nc)
+            }
+        return {**metrics, **self.metrics.compute()}
