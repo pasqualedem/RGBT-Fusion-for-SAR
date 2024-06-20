@@ -198,7 +198,6 @@ class Experimenter:
                     )
                     run = Run()
                     run.init({"experiment": {**self.exp_settings}, **params})
-                    run._prep_for_training()
                     metric = run.launch()
                     print(self.EXP_FINISH_SEP)
                     if self.exp_settings.search == "optim":
