@@ -465,8 +465,9 @@ class EasyDict(dict):
         if isinstance(d, tuple):
             for t in d:
                 setattr(self, t[0], t[1])
-        for k, v in d.items():
-            setattr(self, k, v)
+        else:
+            for k, v in d.items():
+                setattr(self, k, v)
         # Class attributes
         for k in self.__class__.__dict__.keys():
             if not (k.startswith('__') and k.endswith('__')) and not k in ('update', 'pop'):

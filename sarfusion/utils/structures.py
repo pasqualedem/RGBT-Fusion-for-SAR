@@ -1,5 +1,5 @@
 import torch
-from sarfusion.utils import EasyDict
+from sarfusion.utils.utils import EasyDict
 
 
 class ModelOutput(EasyDict):
