@@ -117,6 +117,9 @@ class Run:
         logger.info("Preparing model, optimizer, dataloaders and scheduler")
 
         self.model = self.accelerator.prepare(self.model)
+        
+        if self.params.get("train"):
+            self._prep_for_training()
 
         if self.val_loader:
             logger.info("Preparing validation dataloader")
@@ -151,7 +154,7 @@ class Run:
             self.accelerator.prepare(self.scheduler) if self.scheduler else None
         )
         self._init_metrics(self.params, phase="train")
-
+        
     def _prep_for_validation(self):
         self.val_loader = self.accelerator.prepare(self.val_loader)
         self._init_metrics(self.params, phase="val")
