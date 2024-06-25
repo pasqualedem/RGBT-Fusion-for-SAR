@@ -70,11 +70,11 @@ def build_vit_classifier(**params):
     return vit
 
 
-def build_yolo_v9(cfg, checkpoint=None, iou_t=0.2, conf_t=0.001):
+def build_yolo_v9(cfg, nc=None, checkpoint=None, iou_t=0.2, conf_t=0.001, head={}):
     from sarfusion.models.yolo import Model as YOLOv9
     if checkpoint:
-        return attempt_load(checkpoint)
-    return YOLOv9(cfg)
+        return attempt_load(checkpoint, head=head, iou_thres=iou_t, conf_thres=conf_t)
+    return YOLOv9(cfg, nc=nc, iou_t=iou_t, conf_t=conf_t)
 
 
 MODEL_REGISTRY = {

@@ -35,9 +35,13 @@ parameters:
     name: [yolov9]
     params:
       cfg: [cfg/yolov9-c.yaml]
+      # checkpoint: [checkpoints/yolov9-c-converted.pt]
       iou_t: [0.2]
       conf_t: [0.001]
-      # checkpoint: [checkpoints/yolov9-c-converted.pt]
+      # head: # Replaces the head
+      #   DualDDetect:
+      #     ch: [[512, 512, 512, 256, 512, 512]]
+      #     nc: [6]
 
   dataset: # parameters depending on the class you defined for the dataset
     name: [wisard] 
@@ -50,7 +54,7 @@ parameters:
 
   dataloader:
     num_workers: [0]
-    batch_size: [16]
+    batch_size: [2]
   
   train_metrics:
   val_metrics:

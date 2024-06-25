@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from sarfusion.models.yolo import DetectionModel
 from sarfusion.utils.downloads import attempt_download
 
 
@@ -234,9 +235,9 @@ class End2End(nn.Module):
         return x
 
 
-def attempt_load(weights, device=None, inplace=True, fuse=True):
+def attempt_load(weights, device=None, inplace=True, fuse=True, nc=None, iou_thres=0.2, conf_thres=0.001, head=None):
     # Loads an ensemble of models weights=[a,b,c] or a single model weights=[a] or weights=a
-    from models.yolo import Detect, Model
+    from models.yolo import Detect, DualDDetect, Model
 
     model = Ensemble()
     for w in weights if isinstance(weights, list) else [weights]:
@@ -250,6 +251,9 @@ def attempt_load(weights, device=None, inplace=True, fuse=True):
             ckpt.names = dict(enumerate(ckpt.names))  # convert to dict
 
         model.append(ckpt.fuse().eval() if fuse and hasattr(ckpt, 'fuse') else ckpt.eval())  # model in eval mode
+        
+    if len(model) == 1:
+        model = model[-1]
 
     # Module compatibility updates
     for m in model.modules():
@@ -261,15 +265,18 @@ def attempt_load(weights, device=None, inplace=True, fuse=True):
             #    setattr(m, 'anchor_grid', [torch.zeros(1)] * m.nl)
         elif t is nn.Upsample and not hasattr(m, 'recompute_scale_factor'):
             m.recompute_scale_factor = None  # torch 1.11.0 compatibility
-
-    # Return model
-    if len(model) == 1:
-        return model[-1]
-
-    # Return detection ensemble
-    print(f'Ensemble created with {weights}\n')
-    for k in 'names', 'nc', 'yaml':
-        setattr(model, k, getattr(model[0], k))
-    model.stride = model[torch.argmax(torch.tensor([m.stride.max() for m in model])).int()].stride  # max stride
-    assert all(model[0].nc == m.nc for m in model), f'Models have different class counts: {[m.nc for m in model]}'
+    if head:
+        for m in model.modules():
+            if hasattr(m, 'nc') and type(m).__name__ != "DetectionModel":
+                head_key = list(model.model._modules.keys())[-1]
+                f = m.f
+                head_type = list(head.keys())[0]
+                head_params = list(head.values())[0]
+                m = vars()[head_type](**head_params)
+                model.model._modules[head_key] = m
+                m.f = f
+    if iou_thres:
+        model.iou_thres = iou_thres
+    if conf_thres:
+        model.conf_thres = conf_thres
     return model
