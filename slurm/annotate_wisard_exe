@@ -1,5 +1,0 @@
-#!/bin/bash
-
-conda init
-conda activate sarfusion
-python3 main.py annotate_wisard
