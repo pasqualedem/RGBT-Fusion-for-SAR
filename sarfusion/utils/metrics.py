@@ -412,7 +412,9 @@ def build_metrics(params):
 
 
 def build_evaluator(params, task='classification', **kwargs):
-    metrics = build_metrics(params)
+    if params is None:
+        return EmptyEvaluator()
+    metrics = build_metrics(params.get('metrics', {}))
     if task == 'detection':
         evaluator = DetectionEvaluator(metrics, **kwargs)
     else:
@@ -458,6 +460,20 @@ class Evaluator(Metric):
     
     def reset(self):
         return self.metrics.reset()
+    
+
+class EmptyEvaluator(Evaluator):
+    def __init__(self):
+        super().__init__({})
+        
+    def update(self, *args, **kwargs):
+        return {}
+    
+    def compute(self):
+        return {}
+    
+    def reset(self):
+        return {}
 
 
 class DetectionEvaluator(Evaluator):
