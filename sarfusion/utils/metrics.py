@@ -513,6 +513,8 @@ class DetectionEvaluator(Evaluator):
 
             # Evaluate
             if nl:
+                width, height = shape
+                labels[:, 1:] *= torch.tensor((width, height, width, height), device=device)  # to pixels
                 tbox = xywh2xyxy(labels[:, 1:5])  # target boxes
                 scale_boxes(images[si].shape[1:], tbox, shape, dims[si][1])  # native-space labels
                 labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels

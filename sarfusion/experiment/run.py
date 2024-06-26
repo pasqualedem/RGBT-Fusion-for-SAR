@@ -55,7 +55,6 @@ class Run:
         self.best_metric = None
         self.scheduler_step_moment = None
         self.watch_metric = None
-        self.evaluator = None
         self.train_evaluator: Evaluator = None
         self.val_evaluator: Evaluator = None
         if "." not in sys.path:
@@ -350,9 +349,9 @@ class Run:
             )
             or {}
         )
-        if self.evaluator:
-            m = self.evaluator.update(batch_dict, result_dict)
-            metrics = {**metrics, **m}
+        # if self.val_evaluator:
+        #     m = self.val_evaluator.update(batch_dict, result_dict)
+        #     metrics = {**metrics, **m}
         return metrics
 
     def _update_train_metrics(
@@ -470,6 +469,7 @@ class Run:
                 bar.set_postfix(
                     {
                         "loss": loss,
+                        **metrics_value,
                     }
                 )
 
