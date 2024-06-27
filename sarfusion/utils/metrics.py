@@ -412,7 +412,9 @@ def build_metrics(params):
 
 
 def build_evaluator(params, task='classification', **kwargs):
-    metrics = build_metrics(params)
+    if params is None:
+        return EmptyEvaluator()
+    metrics = build_metrics(params.get('metrics', {}))
     if task == 'detection':
         evaluator = DetectionEvaluator(metrics, **kwargs)
     else:
@@ -458,6 +460,20 @@ class Evaluator(Metric):
     
     def reset(self):
         return self.metrics.reset()
+    
+
+class EmptyEvaluator(Evaluator):
+    def __init__(self):
+        super().__init__({})
+        
+    def update(self, *args, **kwargs):
+        return {}
+    
+    def compute(self):
+        return {}
+    
+    def reset(self):
+        return {}
 
 
 class DetectionEvaluator(Evaluator):
@@ -497,8 +513,10 @@ class DetectionEvaluator(Evaluator):
 
             # Evaluate
             if nl:
+                width, height = shape
+                labels[:, 1:] *= torch.tensor((width, height, width, height), device=device)  # to pixels
                 tbox = xywh2xyxy(labels[:, 1:5])  # target boxes
-                scale_boxes(images[si].shape[1:], tbox, shape, dims[si][1])  # native-space labels
+                # scale_boxes(images[si].shape[1:], tbox, shape, dims[si][1])  # native-space labels
                 labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
                 correct = process_batch(predn, labelsn, iouv)
             self.stats.append((correct, pred[:, 4], pred[:, 5], labels[:, 0]))  # (correct, conf, pcls, tcls)

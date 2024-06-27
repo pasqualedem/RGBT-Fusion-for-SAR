@@ -55,7 +55,6 @@ class Run:
         self.best_metric = None
         self.scheduler_step_moment = None
         self.watch_metric = None
-        self.evaluator = None
         self.train_evaluator: Evaluator = None
         self.val_evaluator: Evaluator = None
         if "." not in sys.path:
@@ -153,11 +152,11 @@ class Run:
         self.scheduler = (
             self.accelerator.prepare(self.scheduler) if self.scheduler else None
         )
-        self._init_metrics(self.params, phase="train")
+        self._init_evaluator(self.params, phase="train")
         
     def _prep_for_validation(self):
         self.val_loader = self.accelerator.prepare(self.val_loader)
-        self._init_metrics(self.params, phase="val")
+        self._init_evaluator(self.params, phase="val")
 
     def _load_state(self):
         if self.tracker.accelerator_state_dir:
@@ -310,8 +309,8 @@ class Run:
         )
         return loss
 
-    def _init_metrics(self, params, phase="train"):
-        evaluator = params.get(f"{phase}_metrics", None)
+    def _init_evaluator(self, params, phase="train"):
+        evaluator = params.get(f"{phase}_evaluation", None)
         evaluator = build_evaluator(
             evaluator, self.task, id2class=self.val_loader.dataset.id2class
         )
@@ -350,9 +349,9 @@ class Run:
             )
             or {}
         )
-        if self.evaluator:
-            m = self.evaluator.update(batch_dict, result_dict)
-            metrics = {**metrics, **m}
+        # if self.val_evaluator:
+        #     m = self.val_evaluator.update(batch_dict, result_dict)
+        #     metrics = {**metrics, **m}
         return metrics
 
     def _update_train_metrics(
@@ -363,7 +362,9 @@ class Run:
         step: int,
     ):
         self.tracker.log_metric("step", self.global_train_step)
-        metric_values = self._update_metrics(self.train_evaluator, batch_dict, result_dict, tot_steps)
+        metric_values = {}
+        if self.train_evaluator is not None:
+            metric_values = self._update_metrics(self.train_evaluator, batch_dict, result_dict, tot_steps)
         return metric_values
 
     def train_epoch(
@@ -468,6 +469,7 @@ class Run:
                 bar.set_postfix(
                     {
                         "loss": loss,
+                        **metrics_value,
                     }
                 )
 

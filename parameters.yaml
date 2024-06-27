@@ -54,9 +54,10 @@ parameters:
 
   dataloader:
     num_workers: [0]
-    batch_size: [16]
+    batch_size: [2]
   
-  train_metrics:
-  val_metrics:
+  # train_evaluation: # evaluation during training
+  val_evaluation: # evaluation during validation
+    metrics: # no extra metrics except standard evaluator
 
 other_grids:
