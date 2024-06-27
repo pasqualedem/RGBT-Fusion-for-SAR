@@ -20,7 +20,7 @@ parameters:
   train:
     max_epochs: [50]
     compile: [False]
-    initial_lr: [0.0001]
+    initial_lr: [0.01]
     optimizer: [AdamW]
     watch_metric: [mAP]
   
