@@ -10,7 +10,8 @@ from sarfusion.data.utils import (
     load_annotations,
     process_image_annotation_folders,
 )
-from sarfusion.utils.augmentations import letterbox
+from sarfusion.utils.general import xywhn2xyxy, xyxy2xywhn
+from sarfusion.utils.transforms import letterbox
 from sarfusion.utils.structures import DataDict
 from sarfusion.utils.transforms import ResizePadKeepRatio
 
@@ -257,11 +258,17 @@ class WiSARDDataset(Dataset):
             img = collate_rgb_ir(img_vis, img_ir)
             targets = load_annotations(annotation_path)
             targets_ir = load_annotations(annotation_path_ir)
+        targets = torch.tensor(targets)
 
         data_dict = DataDict(images=img, target=targets)
         if self.image_size is not None:
             dims = torch.tensor([img.size(1), img.size(2)])
-            data_dict.images, ratio, pad = ResizePadKeepRatio(self.image_size)(img)
+            # data_dict.images, ratio, pad = ResizePadKeepRatio(self.image_size)(img)
+            data_dict.images, ratio, pad = letterbox(img, new_shape=(self.image_size, self.image_size))
+            if targets.numel() > 0:
+                targets[:, 1:] = xywhn2xyxy(targets[:, 1:], ratio[1] * dims[1], ratio[0] * dims[0], padw=pad[1], padh=pad[0])
+                # xywhn2xyxy(t[:, 1:], ratio[1] * dims[1], ratio[0] * dims[0], padw=pad[0], padh=pad[1]) 
+                targets[:, 1:5] = xyxy2xywhn(targets[:, 1:5], w=data_dict.images.shape[2], h=data_dict.images.shape[1], clip=True, eps=1E-3)
             data_dict.dims = dims, (ratio, pad)
         if self.return_path:
             data_dict.path = img_path_vis

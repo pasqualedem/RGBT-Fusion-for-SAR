@@ -392,6 +392,8 @@ class Run:
         metric_values = None
 
         for batch_idx, batch_dict in bar:
+            if batch_idx == 200:
+                break
             batch_dict = DataDict(**batch_dict)
             self.optimizer.zero_grad()
             result_dict: WrapperModelOutput = self._forward(
@@ -458,6 +460,8 @@ class Run:
 
         with torch.no_grad():
             for batch_idx, batch_dict in bar:
+                # if batch_idx == 100:
+                #     break
                 batch_dict = DataDict(**batch_dict)
                 result_dict: WrapperModelOutput = self.model(batch_dict)
 

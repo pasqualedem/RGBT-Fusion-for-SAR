@@ -464,8 +464,8 @@ class WandBLogger(AbstractLogger):
                     class_id = cur_targets[k, 1].int().item()
                     label = id2classes[class_id]
                     box = xywh2xyxy(cur_targets[k, 2:])
-                    H = image.shape[1] - data_dict.dims[i][1][1][0]
-                    W = image.shape[2] - data_dict.dims[i][1][1][1]
+                    H = image.shape[1] # - data_dict.dims[i][1][1][0]
+                    W = image.shape[2] # - data_dict.dims[i][1][1][1]
                     box = (box * torch.tensor([H, W, H, W], device=box.device)).int().tolist()
                     box = {
                         "position": {
@@ -482,13 +482,13 @@ class WandBLogger(AbstractLogger):
             if sum([pred.numel() for pred in result_dict.predictions]) > 0:
                 pred_elem = result_dict.predictions[i]
                 for k in range(pred_elem.shape[0]):
-                    class_id = pred_elem[k, 4].int().item()
-                    conf = pred_elem[k, 5].item()
+                    class_id = pred_elem[k, 5].int().item()
+                    conf = pred_elem[k, 4].item()
                     label = id2classes[class_id]
-                    box = xywh2xyxy(pred_elem[k, :4])
-                    H = image.shape[1] - data_dict.dims[i][1][1][0]
-                    W = image.shape[2] - data_dict.dims[i][1][1][1]
-                    box = (box * torch.tensor([H, W, H, W], device=box.device)).int().tolist()
+                    box = xywh2xyxy(pred_elem[k, :4]).int().tolist() 
+                    H = image.shape[1] # -  data_dict.dims[i][1][1][0]
+                    W = image.shape[2] # - data_dict.dims[i][1][1][1]
+                    # box = (box * torch.tensor([H, W, H, W], device=box.device)).int().tolist() 
                     box = {
                         "position": {
                             "minX": box[0],

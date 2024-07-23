@@ -16,6 +16,7 @@ parameters:
 
   tracker:
     ignored_files: ["*.bin,*.safetensors"]
+    val_image_log_frequency: [200]
 
   train:
     max_epochs: [50]
@@ -35,8 +36,8 @@ parameters:
     name: [yolov9]
     params:
       cfg: [cfg/yolov9-c.yaml]
-      # checkpoint: [checkpoints/yolov9-c-converted.pt]
-      iou_t: [0.2]
+      checkpoint: [checkpoints/yolov9-c.pt]
+      iou_t: [0.7]
       conf_t: [0.001]
       # head: # Replaces the head
       #   DualDDetect:
@@ -47,8 +48,8 @@ parameters:
     name: [wisard] 
     root: [dataset/WiSARD]
     preprocessor:
-      mean: [[0.485, 0.456, 0.406]]
-      std: [[0.229, 0.224, 0.225]]
+      mean: [[0.0, 0.0, 0.0]]
+      std: [[1.0, 1.0, 1.0]]
     folders: [vis]
     image_size: [640]
 

@@ -1,5 +1,6 @@
 from copy import deepcopy
 from enum import StrEnum
+import re
 from transformers import AutoModel, ViTForImageClassification
 
 from sarfusion.experiment.utils import WrapperModule
@@ -72,9 +73,28 @@ def build_vit_classifier(**params):
 
 def build_yolo_v9(cfg, nc=None, checkpoint=None, iou_t=0.2, conf_t=0.001, head={}):
     from sarfusion.models.yolo import Model as YOLOv9
+    # if checkpoint:
+    #     return attempt_load(checkpoint, head=head, iou_thres=iou_t, conf_thres=conf_t)
+    model = YOLOv9(cfg, nc=nc, iou_t=iou_t, conf_t=conf_t)
+    nc = model.model[-1].nc
     if checkpoint:
-        return attempt_load(checkpoint, head=head, iou_thres=iou_t, conf_thres=conf_t)
-    return YOLOv9(cfg, nc=nc, iou_t=iou_t, conf_t=conf_t)
+        weights = torch_dict_load(checkpoint)['model'].state_dict()
+        try:
+            result = model.load_state_dict(weights, strict=False)
+        except RuntimeError as e:
+            error_msg = str(e)
+            pattern = r'size mismatch for ([\w.]+): copying a param with shape torch.Size\((\[.*?\])\) from checkpoint, the shape in current model is torch.Size\((\[.*?\])\)'
+            matches = re.findall(pattern, error_msg)
+            for m in matches:
+                print(f"Detected mismatch in {m[0]}: {m[1]} vs {m[2]}")
+            checkpoint_shapes = [x for m in matches for x in eval(m[1])]
+            model_shapes = [x for m in matches for x in eval(m[2])]
+            diffs = [diff for diff in zip(checkpoint_shapes, model_shapes) if diff[0] != diff[1]]
+            for diff in diffs:
+                assert diff[1] == nc, "Detected a mismatch which is not due to the number of classes"
+            print(f"Loading model with {nc} classes")
+
+    return model
 
 
 MODEL_REGISTRY = {
