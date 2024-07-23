@@ -19,9 +19,9 @@ parameters:
     val_image_log_frequency: [200]
 
   train:
-    max_epochs: [50]
+    max_epochs: [500]
     compile: [False]
-    initial_lr: [0.01]
+    initial_lr: [0.001]
     optimizer: [AdamW]
     watch_metric: [mAP]
   
