@@ -392,8 +392,8 @@ class Run:
         metric_values = None
 
         for batch_idx, batch_dict in bar:
-            # if batch_idx == 200:
-            #     break
+            if batch_idx == 200:
+                break
             batch_dict = DataDict(**batch_dict)
             self.optimizer.zero_grad()
             result_dict: WrapperModelOutput = self._forward(

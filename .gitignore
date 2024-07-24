@@ -140,6 +140,7 @@ cython_debug/
 # End of https://mrkandreev.name/snippets/gitignore-generator/#Python
 
 dataset
+datasets
 *.pt
 *.pth
 
@@ -147,3 +148,4 @@ wandb
 offline
 checkpoints
 out
+runs

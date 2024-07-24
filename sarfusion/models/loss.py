@@ -2,9 +2,11 @@ from copy import deepcopy
 import torch.nn as nn
 from sarfusion.experiment.utils import unwrap_model
 from sarfusion.utils.loss_tal_dual import ComputeLoss as YOLOLoss
+from sarfusion.utils.lossv10 import v10DetectLoss
 
 LOSS_REGISTRY = {
     "yolo_loss": YOLOLoss,
+    "v10_loss": v10DetectLoss,
 }
 
 

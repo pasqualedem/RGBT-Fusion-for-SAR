@@ -6,6 +6,7 @@ from transformers import AutoModel, ViTForImageClassification
 from sarfusion.experiment.utils import WrapperModule
 from sarfusion.models.experimental import attempt_load
 from sarfusion.models.utils import torch_dict_load
+from sarfusion.models.yolov10 import YOLOv10
 from sarfusion.utils.utils import load_yaml
 
 
@@ -16,12 +17,12 @@ class AdditionalParams(StrEnum):
 def build_model(params):
     """
     Build a model from a yaml file or a dictionary
-    
+
     Args:
         params (dict or str): Dictionary or path to yaml file containing model parameters
         Additional parameters:
             pretrained_path: The path of the pretrained model
-        
+
     """
     if isinstance(params, str):
         params = load_yaml(params)
@@ -31,10 +32,10 @@ def build_model(params):
     pretrained_path = params.pop(AdditionalParams.PRETRAINED_PATH, None)
 
     if name in MODEL_REGISTRY:
-        model =  MODEL_REGISTRY[name](**params)
+        model = MODEL_REGISTRY[name](**params)
     else:
         model = AutoModel.from_pretrained(name)
-      
+
     if pretrained_path:
         model.load_state_dict(torch_dict_load(pretrained_path))
         print(f"Loaded model from {pretrained_path}")
@@ -46,7 +47,9 @@ def backbone_learnable_params(self, train_params: dict):
     if freeze_backbone:
         for param in self.vit.parameters():
             param.requires_grad = False
-        return [{"params": [x[1] for x in self.named_parameters() if x[1].requires_grad]}]
+        return [
+            {"params": [x[1] for x in self.named_parameters() if x[1].requires_grad]}
+        ]
     return [{"params": list(self.parameters())}]
 
 
@@ -63,7 +66,7 @@ def build_vit_classifier(**params):
         id2label=id2label,
         label2id=label2id,
         ignore_mismatched_sizes=True,
-        **params
+        **params,
     )
     vit.get_learnable_params = backbone_learnable_params.__get__(
         vit, ViTForImageClassification
@@ -71,33 +74,54 @@ def build_vit_classifier(**params):
     return vit
 
 
+def nc_safe_load(model, weights, nc):
+    try:
+        result = model.load_state_dict(weights, strict=False)
+    except RuntimeError as e:
+        error_msg = str(e)
+        pattern = r"size mismatch for ([\w.]+): copying a param with shape torch.Size\((\[.*?\])\) from checkpoint, the shape in current model is torch.Size\((\[.*?\])\)"
+        matches = re.findall(pattern, error_msg)
+        for m in matches:
+            print(f"Detected mismatch in {m[0]}: {m[1]} vs {m[2]}")
+        checkpoint_shapes = [x for m in matches for x in eval(m[1])]
+        model_shapes = [x for m in matches for x in eval(m[2])]
+        diffs = [
+            diff
+            for diff in zip(checkpoint_shapes, model_shapes)
+            if diff[0] != diff[1]
+        ]
+        for diff in diffs:
+            assert (
+                diff[1] == nc
+            ), "Detected a mismatch which is not due to the number of classes"
+        print(f"Loading model with {nc} classes")
+
+
 def build_yolo_v9(cfg, nc=None, checkpoint=None, iou_t=0.2, conf_t=0.001, head={}):
     from sarfusion.models.yolo import Model as YOLOv9
+
     # if checkpoint:
     #     return attempt_load(checkpoint, head=head, iou_thres=iou_t, conf_thres=conf_t)
     model = YOLOv9(cfg, nc=nc, iou_t=iou_t, conf_t=conf_t)
     nc = model.model[-1].nc
     if checkpoint:
-        weights = torch_dict_load(checkpoint)['model'].state_dict()
-        try:
-            result = model.load_state_dict(weights, strict=False)
-        except RuntimeError as e:
-            error_msg = str(e)
-            pattern = r'size mismatch for ([\w.]+): copying a param with shape torch.Size\((\[.*?\])\) from checkpoint, the shape in current model is torch.Size\((\[.*?\])\)'
-            matches = re.findall(pattern, error_msg)
-            for m in matches:
-                print(f"Detected mismatch in {m[0]}: {m[1]} vs {m[2]}")
-            checkpoint_shapes = [x for m in matches for x in eval(m[1])]
-            model_shapes = [x for m in matches for x in eval(m[2])]
-            diffs = [diff for diff in zip(checkpoint_shapes, model_shapes) if diff[0] != diff[1]]
-            for diff in diffs:
-                assert diff[1] == nc, "Detected a mismatch which is not due to the number of classes"
-            print(f"Loading model with {nc} classes")
+        weights = torch_dict_load(checkpoint)["model"].state_dict()
+        nc_safe_load(model.model, weights, nc)
 
+    return model
+
+
+def build_yolo_v10(id2label, path="jameslahm/yolov10x", cfg=None):
+    pretrained_model = YOLOv10.from_pretrained(path, names=id2label).model
+    model = YOLOv10(model=cfg, names=id2label, task="detect").model
+    nc = len(id2label)
+    weights = pretrained_model.state_dict()
+    nc_safe_load(model, weights, nc)
     return model
 
 
 MODEL_REGISTRY = {
     "vit_classifier": build_vit_classifier,
     "yolov9": build_yolo_v9,
+    "yolov10": build_yolo_v10,
 }

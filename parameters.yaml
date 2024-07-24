@@ -26,23 +26,22 @@ parameters:
     watch_metric: [mAP]
   
   loss:
-    name: [yolo_loss]
+    name: [v10_loss]
     params:
       requires_model: [True]
-      cls_pw: [1.0]
-      fl_gamma: [0.0]
   
   model:
-    name: [yolov9]
+    name: [yolov10]
     params:
-      cfg: [cfg/yolov9-c.yaml]
-      checkpoint: [checkpoints/yolov9-c.pt]
-      iou_t: [0.7]
-      conf_t: [0.001]
-      # head: # Replaces the head
-      #   DualDDetect:
-      #     ch: [[512, 512, 512, 256, 512, 512]]
-      #     nc: [6]
+      id2label:
+        "0": [running]
+        "1": [walking]
+        "2": [laying_down]
+        "3": [not_defined]
+        "4": [seated]
+        "5": [stands]
+      path: [jameslahm/yolov10s]
+      cfg: [sarfusion/models/hub/yolov10s.yaml]
 
   dataset: # parameters depending on the class you defined for the dataset
     name: [wisard] 
