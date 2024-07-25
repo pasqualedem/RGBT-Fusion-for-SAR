@@ -392,7 +392,7 @@ class Run:
         metric_values = None
 
         for batch_idx, batch_dict in bar:
-            if batch_idx == 200:
+            if batch_idx == 100:
                 break
             batch_dict = DataDict(**batch_dict)
             self.optimizer.zero_grad()
@@ -468,7 +468,7 @@ class Run:
                 metrics_value = self._update_val_metrics(
                     batch_dict, result_dict, tot_steps
                 )
-                loss = result_dict.loss.value.item()
+                loss = result_dict.loss.value.item() if result_dict.loss is not None else 0
                 avg_loss.update(loss)
                 bar.set_postfix(
                     {

@@ -130,7 +130,7 @@ class WrapperModule(torch.nn.Module):
         result_dict = self.model(**model_dict)
         
         loss = None
-        if input_dict.target is not None and self.loss is not None:
+        if input_dict.target is not None and self.loss is not None and self.training:
             loss = self.loss(result_dict, input_dict.target)
         return WrapperModelOutput(loss=loss, **result_dict)
 

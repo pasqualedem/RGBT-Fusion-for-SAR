@@ -10,21 +10,27 @@ from ultralytics.utils import ops
 from huggingface_hub import PyTorchModelHubMixin
 from ultralytics.models.yolov10.card import card_template_text
 
+from sarfusion.utils.structures import ModelOutput
+
 
 class YOLOv10DetectionModel(YOLOv10DetectionModelUltra):    
     def forward(self, images):
         if self.training:
-            return super().forward(x=images)
+            features = super().forward(x=images)
+            return ModelOutput(features=features)
         else:
-            preds = super().forward(x=images)
-            if isinstance(preds, dict):
-                preds = preds["one2one"]
-            if isinstance(preds, (list, tuple)):
-                preds = preds[0]
-            preds = preds.transpose(-1, -2)
-            boxes, scores, labels = ops.v10postprocess(preds, self.args["max_det"], self.nc)
+            result = super().forward(x=images)
+            if isinstance(result, dict):
+                features = result["one2one"]
+            else:
+                features = result
+            if isinstance(features, (list, tuple)):
+                features = features[0]
+            preds = features.transpose(-1, -2)
+            boxes, scores, labels = ops.v10postprocess(preds, self.args["max_det"], len(self.names))
             bboxes = ops.xywh2xyxy(boxes)
-            return torch.cat([bboxes, scores.unsqueeze(-1), labels.unsqueeze(-1)], dim=-1)
+            preds = torch.cat([bboxes, scores.unsqueeze(-1), labels.unsqueeze(-1)], dim=-1)
+            return ModelOutput(logits=preds, features=result)
     
     def get_learnable_params(self, train_params):
         return [{"params": self.model.parameters()}]

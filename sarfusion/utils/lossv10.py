@@ -16,7 +16,7 @@ from ultralytics.utils.tal import (
 from ultralytics.utils.metrics import bbox_iou, probiou
 from ultralytics.utils.tal import bbox2dist
 
-from sarfusion.utils.structures import LossOutput
+from sarfusion.utils.structures import LossOutput, ModelOutput
 
 
 class VarifocalLoss(nn.Module):
@@ -909,10 +909,11 @@ class v10DetectLoss:
         self.one2many = v8DetectionLoss(model, tal_topk=10)
         self.one2one = v8DetectionLoss(model, tal_topk=1)
 
-    def __call__(self, preds, targets):
-        one2many = preds["one2many"]
+    def __call__(self, preds: ModelOutput, targets):
+        features = preds.features
+        one2many = features["one2many"]
         loss_one2many = self.one2many(one2many, targets)
-        one2one = preds["one2one"]
+        one2one = features["one2one"]
         loss_one2one = self.one2one(one2one, targets)
         return LossOutput(
             value=(loss_one2many[0] + loss_one2one[0]),
