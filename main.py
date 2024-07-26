@@ -62,5 +62,12 @@ def run(parameters):
     from sarfusion.experiment.experiment import run as run_single
     run_single(param_path=parameters)
     
+    
+@main.command("yolo")
+def yolo():
+    from sarfusion.train import yolo_train
+    yolo_train()
+    
+    
 if __name__ == "__main__":
     main()

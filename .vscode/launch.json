@@ -60,6 +60,17 @@
             ]
         },
         {
+            "name": "Yolo",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "yolo"
+            ]
+        },
+        {
             "name": "Annotate Wisard",
             "type": "debugpy",
             "request": "launch",
