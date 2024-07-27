@@ -90,9 +90,10 @@ def yolo_train(parameters):
     generate_wisard_filelist(root, val_folders, "val.txt")
     test_folders = [folder for folder in get_wisard_folders(folders) if  folder in TEST_FOLDERS]
     generate_wisard_filelist(root, test_folders, "test.txt")
-
-    model = YOLOv10.from_pretrained('jameslahm/yolov10n')
     args = load_yaml(parameters)
+
+    model = args.pop("model")
+    model = YOLOv10.from_pretrained(model)
     args.pop("experiment")
     args = {k: (v if v != {} else None) for k, v in args.items()}
 
