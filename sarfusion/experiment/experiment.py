@@ -223,8 +223,9 @@ class ParallelExperimenter(Experimenter):
     EXP_FINISH_SEP = "#" * 50 + " LAUNCHED " + "#" * 50 + "\n"
     EXP_CRASHED_SEP = "|\\" * 50 + "CRASHED" + "|\\" * 50 + "\n"
 
-    def __init__(self):
+    def __init__(self, yolo=False):
         super().__init__()
+        self.yolo = yolo
 
     def execute_runs(self, only_create=False):
         starting_run = self.exp_settings.start_from_run
@@ -243,6 +244,7 @@ class ParallelExperimenter(Experimenter):
                     )
                     run = ParallelRun(
                         experiment_timestamp=self.exp_settings.timestamp,
+                        yolo=self.yolo,
                         params={"experiment": {**self.exp_settings}, **params},
                     )
                     metric = run.launch(only_create=only_create)
@@ -262,12 +264,13 @@ def experiment(
     parallel: bool = False,
     only_create: bool = False,
     preview: bool = False,
+    yolo: bool = False,
 ):
     logger.info("Running experiment")
     settings = load_yaml(param_path)
     logger.info(f"Loaded parameters from {param_path}")
 
-    experimenter = ParallelExperimenter() if parallel or only_create else Experimenter()
+    experimenter = ParallelExperimenter(yolo=yolo) if parallel or only_create else Experimenter()
     experimenter.calculate_runs(settings)
     if not preview:
         experimenter.execute_runs(only_create=only_create)

@@ -12,6 +12,7 @@ logger = get_logger(__name__)
 class ParallelRun:
     slurm_command = "sbatch"
     slurm_script = "slurm/launch_run"
+    yolo_slurm_script = "slurm/launch_yolo"
     slurm_script_first_parameter = "--parameters="
     slurm_outfolder = "out"
     out_extension = "out"
@@ -19,8 +20,9 @@ class ParallelRun:
     slurm_stderr = "-e"
     slurm_stdout = "-o"
 
-    def __init__(self, params: dict, experiment_timestamp: str):
+    def __init__(self, params: dict, experiment_timestamp: str, yolo=False):
         self.params = params
+        self.launch_script = self.yolo_slurm_script if yolo else self.slurm_script
         self.exp_timestamp = experiment_timestamp
         if "." not in sys.path:
             sys.path.extend(".")
@@ -42,7 +44,7 @@ class ParallelRun:
             out_file,
             self.slurm_stderr,
             out_file,
-            self.slurm_script,
+            self.launch_script,
             self.slurm_script_first_parameter + param_file,
         ]
         if only_create:

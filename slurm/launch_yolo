@@ -13,4 +13,4 @@
 #SBATCH --out=run.out
 #SBATCH --err=run.out
 
-srun ./slurm/launch_run_exe $@
+srun ./slurm/launch_yolo_exe $@

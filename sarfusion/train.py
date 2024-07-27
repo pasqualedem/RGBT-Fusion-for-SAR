@@ -5,6 +5,7 @@ from ultralytics.utils.plotting import plot_images
 from sarfusion.data.wisard import TEST_FOLDERS, TRAIN_FOLDERS, VAL_FOLDERS, WiSARDYOLODataset, build_wisard_items, get_wisard_folders
 from sarfusion.utils.general import colorstr
 from sarfusion.utils.torch_utils import de_parallel
+from sarfusion.utils.utils import load_yaml
 
 
 class YOLOv10WiSARD(YOLOv10):
@@ -79,7 +80,7 @@ def generate_wisard_filelist(root, folders, filename):
     return images
 
 
-def yolo_train():
+def yolo_train(parameters):
     root = "dataset/WiSARD"
     folders = "vis"
     
@@ -91,14 +92,8 @@ def yolo_train():
     generate_wisard_filelist(root, test_folders, "test.txt")
 
     model = YOLOv10.from_pretrained('jameslahm/yolov10n')
-    args = dict(
-        data="wisard.yaml",
-        epochs=500,
-        batch=4,
-        imgsz=640,
-        mosaic=False,
-        plots=True,
-        workers=0,
-    )
+    args = load_yaml(parameters)
+    args.pop("experiment")
+    args = {k: (v if v != {} else None) for k, v in args.items()}
 
     model.train(trainer=WisardTrainer, **args)

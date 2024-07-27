@@ -44,14 +44,17 @@ def annotate_wisard(model_yaml):
     "--parallel", default=False, help="Run the experiments in parallel", is_flag=True
 )
 @click.option(
+    "--yolo", default=False, help="Run the experiments with YOLO workspace", is_flag=True
+)
+@click.option(
     "--only-create",
     default=False,
     help="Creates params files with running them",
     is_flag=True,
 )
-def experiment(parameters, parallel, only_create):
+def experiment(parameters, parallel, only_create, yolo):
     from sarfusion.experiment.experiment import experiment as run_experiment
-    run_experiment(param_path=parameters, parallel=parallel, only_create=only_create)
+    run_experiment(param_path=parameters, parallel=parallel, only_create=only_create, yolo=yolo)
 
 
 @main.command("run")
@@ -64,9 +67,12 @@ def run(parameters):
     
     
 @main.command("yolo")
-def yolo():
+@click.option(
+    "--parameters", default="parameters.yaml", help="Path to the parameters file"
+)
+def yolo(parameters):
     from sarfusion.train import yolo_train
-    yolo_train()
+    yolo_train(parameters)
     
     
 if __name__ == "__main__":
