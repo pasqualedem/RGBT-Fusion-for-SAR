@@ -3,7 +3,7 @@ import torch
 
 from ultralytics import YOLOv10
 from ultralytics.utils.loss import v10DetectLoss
-from ultralytics.utils import ops
+from ultralytics.nn.tasks import guess_model_task, BaseModel
 
 from ultralytics.nn.modules import (
     OBB,
@@ -13,14 +13,13 @@ from ultralytics.nn.modules import (
     v10Detect
 )
 from ultralytics.utils.torch_utils import initialize_weights, scale_img
-from ultralytics.nn.tasks import yaml_model_load, BaseModel
-from ultralytics.utils import LOGGER
+from ultralytics.utils import LOGGER, RANK, DEFAULT_CFG_DICT
 
 from huggingface_hub import PyTorchModelHubMixin
 from ultralytics.models.yolov10.card import card_template_text
 
 from sarfusion.experiment.yolo import WisardTrainer
-from sarfusion.models.utils import fusion_pretraining_load
+from sarfusion.models.utils import fusion_pretraining_load, yaml_model_load
 # from sarfusion.utils.lossv10 import v10DetectLoss
 from sarfusion.utils.structures import ModelOutput
 from sarfusion.models.parse import parse_model
@@ -136,6 +135,28 @@ class YOLOv10WiSARD(YOLOv10):
         task_map['detect']['trainer'] = WisardTrainer
         # task_map['detect']['validator'] = WisardValidator
         return task_map
+    
+    def _new(self, cfg: str, task=None, model=None, verbose=False) -> None:
+        """
+        Initializes a new model and infers the task type from the model definitions.
+
+        Args:
+            cfg (str): model configuration file
+            task (str | None): model task
+            model (BaseModel): Customized model.
+            verbose (bool): display model info on load
+        """
+        cfg_dict = yaml_model_load(cfg)
+        self.cfg = cfg
+        self.task = task or guess_model_task(cfg_dict)
+        self.model = (model or self._smart_load("model"))(cfg_dict, verbose=verbose and RANK == -1)  # build model
+        self.overrides["model"] = self.cfg
+        self.overrides["task"] = self.task
+
+        # Below added to allow export from YAMLs
+        self.model.args = {**DEFAULT_CFG_DICT, **self.overrides}  # combine default and model args (prefer model args)
+        self.model.task = self.task
+        self.model_name = cfg
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, fusion_pretraining=False, cfg=None, **kwargs):
@@ -144,4 +165,6 @@ class YOLOv10WiSARD(YOLOv10):
             model = YOLOv10WiSARD(model=cfg, task="detect")
             fusion_pretraining_load(model, pretrained_model.state_dict())
             return model
-        return super().from_pretrained(pretrained_model_name_or_path, **{**kwargs, 'cfg': cfg})
+        if cfg:
+            kwargs['model'] = cfg
+        return super().from_pretrained(pretrained_model_name_or_path, **kwargs)

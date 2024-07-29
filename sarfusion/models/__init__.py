@@ -1,3 +1,5 @@
+import tempfile
+
 from copy import deepcopy
 from enum import StrEnum
 from transformers import AutoModel, ViTForImageClassification
@@ -7,6 +9,7 @@ from sarfusion.models.experimental import attempt_load
 from sarfusion.models.utils import torch_dict_load
 from sarfusion.models.utils import nc_safe_load
 from sarfusion.models.yolov10 import YOLOv10WiSARD
+from sarfusion.utils.general import yaml_save
 from sarfusion.utils.utils import load_yaml
 
 
@@ -97,7 +100,17 @@ def build_yolo_v10(
             fusion_pretraining=fusion_pretraining,
             cfg=cfg,
         ).model
-        model = YOLOv10WiSARD(model=cfg, task="detect").model
+        cfg = cfg or pretrained_model.yaml
+        # Temporary file to load the model
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".yaml")
+        if isinstance(cfg, dict):
+            cfg['nc'] = nc
+            yaml_save(tmp.name, cfg)
+        elif isinstance(cfg, str):
+            cfg_dict = load_yaml(cfg)
+            cfg_dict['nc'] = nc
+            yaml_save(tmp.name, cfg_dict)
+        model = YOLOv10WiSARD(model=tmp.name, task="detect").model
         weights = pretrained_model.state_dict()
         nc_safe_load(model, weights, nc)
     return model

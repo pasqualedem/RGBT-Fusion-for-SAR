@@ -1,4 +1,10 @@
+from pathlib import Path
+import re
 import torch
+
+from ultralytics.utils import LOGGER, yaml_load
+from ultralytics.utils.checks import check_yaml
+from ultralytics.nn.tasks import guess_model_scale
 
 
 from safetensors import safe_open
@@ -75,3 +81,24 @@ def nc_safe_load(model, weights, nc):
                 diff[1] == nc
             ), "Detected a mismatch which is not due to the number of classes"
         print(f"Loading model with {nc} classes")
+
+
+def yaml_model_load(path):
+    """Load a YOLOv8 model from a YAML file."""
+    import re
+
+    path = Path(path)
+    if path.stem in (f"yolov{d}{x}6" for x in "nsmlx" for d in (5, 8)):
+        new_stem = re.sub(r"(\d+)([nslmx])6(.+)?$", r"\1\2-p6\3", path.stem)
+        LOGGER.warning(f"WARNING ⚠️ Ultralytics YOLO P6 models now use -p6 suffix. Renaming {path.stem} to {new_stem}.")
+        path = path.with_name(new_stem + path.suffix)
+
+    if "v10" not in str(path) and "yolo" in str(path):
+        unified_path = re.sub(r"(\d+)([nsblmx])(.+)?$", r"\1\3", str(path))  # i.e. yolov8x.yaml -> yolov8.yaml
+    else:
+        unified_path = path
+    yaml_file = check_yaml(unified_path, hard=False) or check_yaml(path)
+    d = yaml_load(yaml_file)  # model dict
+    d["scale"] = guess_model_scale(path)
+    d["yaml_file"] = str(path)
+    return d
