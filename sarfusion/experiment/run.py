@@ -12,16 +12,20 @@ from torch.optim import AdamW
 from torchmetrics import MetricCollection
 from tqdm import tqdm
 
+from sarfusion.data.wisard import TEST_FOLDERS, TRAIN_FOLDERS, VAL_FOLDERS, get_wisard_folders
+from sarfusion.experiment.yolo import WisardTrainer
+from sarfusion.models.yolov10 import YOLOv10WiSARD
 from sarfusion.utils.structures import WrapperModelOutput
 from sarfusion.utils.logger import get_logger
 from sarfusion.data import get_dataloaders
 from sarfusion.utils.structures import DataDict
-from sarfusion.experiment.utils import WrapperModule
+from sarfusion.experiment.utils import WrapperModule, generate_wisard_filelist
 from sarfusion.models.loss import build_loss
 from sarfusion.models import build_model
 from sarfusion.utils.metrics import DetectionEvaluator, Evaluator, build_evaluator
 from sarfusion.utils.utils import (
     RunningAverage,
+    load_yaml,
     write_yaml,
 )
 
@@ -528,3 +532,44 @@ class Run:
         logger.info("Ending run")
         self.tracker.end()
         logger.info("Run ended")
+
+
+def yolo_train(parameters):
+    root = "dataset/WiSARD"
+    folders = "vis"
+
+    train_folders = [folder for folder in get_wisard_folders(folders) if  folder in TRAIN_FOLDERS]
+    generate_wisard_filelist(root, train_folders, "train.txt")
+    val_folders = [folder for folder in get_wisard_folders(folders) if  folder in VAL_FOLDERS]
+    generate_wisard_filelist(root, val_folders, "val.txt")
+    test_folders = [folder for folder in get_wisard_folders(folders) if  folder in TEST_FOLDERS]
+    generate_wisard_filelist(root, test_folders, "test.txt")
+    if isinstance(parameters, str):
+        args = load_yaml(parameters)
+    else:
+        args = parameters
+
+    # args['model'] = None
+    # model = args.pop("model")
+    # model = YOLOv10WiSARD.from_pretrained(**model)
+    args.pop("experiment")
+    args = {k: (v if v != {} else None) for k, v in args.items()}
+    model = args.pop("model")
+    args['model'] = None
+    
+    trainer = WisardTrainer(overrides=args)
+    model['params']['nc'] = trainer.data["nc"]
+    
+    trainer.model = build_model(model)
+    trainer.train()
+
+
+class YoloRun:
+    def __init__(self) -> None:
+        self.parameters = None
+
+    def init(self, parameters) -> None:
+        self.parameters = parameters
+
+    def launch(self) -> None:
+        yolo_train(self.parameters)

@@ -8,6 +8,7 @@ import pandas as pd
 from typing import Mapping
 from easydict import EasyDict
 
+from sarfusion.experiment.run import YoloRun
 from sarfusion.utils.logger import get_logger
 from sarfusion.experiment.run import Run
 from sarfusion.experiment.parallel import ParallelRun
@@ -87,10 +88,11 @@ class Experimenter:
     EXP_FINISH_SEP = "#" * 50 + " FINISHED " + "#" * 50 + "\n"
     EXP_CRASHED_SEP = "|\\" * 50 + "CRASHED" + "|\\" * 50 + "\n"
 
-    def __init__(self):
+    def __init__(self, yolo=False):
         self.gs = None
         self.exp_settings = ExpSettings()
         self.grids = None
+        self.run_class = YoloRun if yolo else Run
 
     def calculate_runs(self, settings):
         base_grid = settings["parameters"]
@@ -196,7 +198,7 @@ class Experimenter:
                     logger.info(
                         f"Running run {j} out of {len(grid) - 1} ({sum(len(self.grids[k]) for k in range(i)) + j} / {self.gs.total_runs - 1})"
                     )
-                    run = Run()
+                    run = self.run_class()
                     run.init({"experiment": {**self.exp_settings}, **params})
                     metric = run.launch()
                     print(self.EXP_FINISH_SEP)
@@ -270,7 +272,7 @@ def experiment(
     settings = load_yaml(param_path)
     logger.info(f"Loaded parameters from {param_path}")
 
-    experimenter = ParallelExperimenter(yolo=yolo) if parallel or only_create else Experimenter()
+    experimenter = ParallelExperimenter(yolo=yolo) if parallel or only_create else Experimenter(yolo=yolo)
     experimenter.calculate_runs(settings)
     if not preview:
         experimenter.execute_runs(only_create=only_create)

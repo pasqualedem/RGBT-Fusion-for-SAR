@@ -1,21 +1,8 @@
-import os
-from ultralytics import YOLOv10
 from ultralytics.models.yolov10.train import YOLOv10DetectionTrainer, YOLOv10DetectionValidator
 from ultralytics.utils.plotting import plot_images
-from sarfusion.data.wisard import TEST_FOLDERS, TRAIN_FOLDERS, VAL_FOLDERS, WiSARDYOLODataset, build_wisard_items, get_wisard_folders
+from sarfusion.data.wisard import WiSARDYOLODataset
 from sarfusion.utils.general import colorstr
 from sarfusion.utils.torch_utils import de_parallel
-from sarfusion.utils.utils import load_yaml
-
-
-class YOLOv10WiSARD(YOLOv10):
-    @property
-    def task_map(self):
-        """Map head to model, trainer, validator, and predictor classes."""
-        task_map = super().task_map
-        task_map['detect']['trainer'] = WisardTrainer
-        # task_map['detect']['validator'] = WisardValidator
-        return task_map
 
 
 def build_yolo_dataset(cfg, img_path, batch, data, mode="train", rect=False, stride=32):
@@ -66,35 +53,8 @@ class WisardTrainer(YOLOv10DetectionTrainer):
         return build_yolo_dataset(self.args, img_path, batch, self.data, mode=mode, rect=mode == "val", stride=gs)
     
 
-def generate_wisard_filelist(root, folders, filename):
-    items = build_wisard_items(root, folders)
-    images = []
-    for item in items:
-        if isinstance(item[1][0], str):
-            images.append(item[1][0])
-        else:
-            images.append(item[1][0][0] + "," + item[1][1][0])
-    with open(os.path.join(root, filename), "w") as f:
-        for item in images:
-            f.write(f"{item}\n")
-    return images
-
-
-def yolo_train(parameters):
-    root = "dataset/WiSARD"
-    folders = "vis"
-    
-    train_folders = [folder for folder in get_wisard_folders(folders) if  folder in TRAIN_FOLDERS]
-    generate_wisard_filelist(root, train_folders, "train.txt")
-    val_folders = [folder for folder in get_wisard_folders(folders) if  folder in VAL_FOLDERS]
-    generate_wisard_filelist(root, val_folders, "val.txt")
-    test_folders = [folder for folder in get_wisard_folders(folders) if  folder in TEST_FOLDERS]
-    generate_wisard_filelist(root, test_folders, "test.txt")
-    args = load_yaml(parameters)
-
-    model = args.pop("model")
-    model = YOLOv10.from_pretrained(model)
-    args.pop("experiment")
-    args = {k: (v if v != {} else None) for k, v in args.items()}
-
-    model.train(trainer=WisardTrainer, **args)
+    def get_model(self, cfg=None, weights=None, verbose=True):
+        """Return a YOLO detection model."""
+        model = YOLOv10DetectionModel(cfg, nc=self.data["nc"], verbose=verbose and RANK == -1)
+        if weights:
+            model.load(weights)

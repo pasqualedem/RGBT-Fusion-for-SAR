@@ -1,11 +1,8 @@
 from copy import deepcopy
 import torch
 
-from ultralytics.engine.model import Model
-from ultralytics.nn.tasks import YOLOv10DetectionModel as YOLOv10DetectionModelUltra
-from ultralytics.models.yolov10.val import YOLOv10DetectionValidator
-from ultralytics.models.yolov10.predict import YOLOv10DetectionPredictor
-from ultralytics.models.yolov10.train import YOLOv10DetectionTrainer
+from ultralytics import YOLOv10
+from ultralytics.utils.loss import v10DetectLoss
 from ultralytics.utils import ops
 
 from ultralytics.nn.modules import (
@@ -16,14 +13,17 @@ from ultralytics.nn.modules import (
     v10Detect
 )
 from ultralytics.utils.torch_utils import initialize_weights, scale_img
-from ultralytics.nn.tasks import parse_model, yaml_model_load, BaseModel
+from ultralytics.nn.tasks import yaml_model_load, BaseModel
 from ultralytics.utils import LOGGER
 
 from huggingface_hub import PyTorchModelHubMixin
 from ultralytics.models.yolov10.card import card_template_text
 
-from sarfusion.utils.lossv10 import v10DetectLoss
+from sarfusion.experiment.yolo import WisardTrainer
+from sarfusion.models.utils import fusion_pretraining_load
+# from sarfusion.utils.lossv10 import v10DetectLoss
 from sarfusion.utils.structures import ModelOutput
+from sarfusion.models.parse import parse_model
 
 
 class YOLOv10DetectionModel(BaseModel):
@@ -51,7 +51,8 @@ class YOLOv10DetectionModel(BaseModel):
             m.inplace = self.inplace
             forward = lambda x: self.forward(x)[0] if isinstance(m, (Segment, Pose, OBB)) else self.forward(x)
             if isinstance(m, v10Detect):
-                forward = lambda x: self.forward(x).features["one2many"]
+                # forward = lambda x: self.forward(x).features["one2many"]
+                forward = lambda x: self.forward(x)["one2many"]
             m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward
             self.stride = m.stride
             m.bias_init()  # only run once
@@ -104,52 +105,43 @@ class YOLOv10DetectionModel(BaseModel):
         y[-1] = y[-1][..., i:]  # small
         return y
 
-    def forward(self, images):
-        if self.training:
-            features = super().forward(x=images)
-            return ModelOutput(features=features)
-        else:
-            result = super().forward(x=images)
-            if isinstance(result, dict):
-                features = result["one2one"]
-            else:
-                features = result
-            if isinstance(features, (list, tuple)):
-                features = features[0]
-            preds = features.transpose(-1, -2)
-            boxes, scores, labels = ops.v10postprocess(preds, self.args["max_det"], len(self.names))
-            bboxes = ops.xywh2xyxy(boxes)
-            preds = torch.cat([bboxes, scores.unsqueeze(-1), labels.unsqueeze(-1)], dim=-1)
-            return ModelOutput(logits=preds, features=result)
+    # def forward(self, images):
+    #     if self.training:
+    #         features = super().forward(x=images)
+    #         return ModelOutput(features=features)
+    #     else:
+    #         result = super().forward(x=images)
+    #         if isinstance(result, dict):
+    #             features = result["one2one"]
+    #         else:
+    #             features = result
+    #         if isinstance(features, (list, tuple)):
+    #             features = features[0]
+    #         preds = features.transpose(-1, -2)
+    #         boxes, scores, labels = ops.v10postprocess(preds, self.args["max_det"], len(self.names))
+    #         bboxes = ops.xywh2xyxy(boxes)
+    #         preds = torch.cat([bboxes, scores.unsqueeze(-1), labels.unsqueeze(-1)], dim=-1)
+    #         return ModelOutput(logits=preds, features=result)
     
     def get_learnable_params(self, train_params):
         return [{"params": self.model.parameters()}]
 
 
-class YOLOv10(Model, PyTorchModelHubMixin, model_card_template=card_template_text):
-
-    def __init__(self, model="yolov10x.pt", task=None, verbose=False, 
-                 names=None):
-        super().__init__(model=model, task=task, verbose=verbose)
-        if names is not None:
-            setattr(self.model, 'names', names)
-
-    def push_to_hub(self, repo_name, **kwargs):
-        config = kwargs.get('config', {})
-        config['names'] = self.names
-        config['model'] = self.model.yaml['yaml_file']
-        config['task'] = self.task
-        kwargs['config'] = config
-        super().push_to_hub(repo_name, **kwargs)
-
+class YOLOv10WiSARD(YOLOv10):
     @property
     def task_map(self):
         """Map head to model, trainer, validator, and predictor classes."""
-        return {
-            "detect": {
-                "model": YOLOv10DetectionModel,
-                "trainer": YOLOv10DetectionTrainer,
-                "validator": YOLOv10DetectionValidator,
-                "predictor": YOLOv10DetectionPredictor,
-            },
-        }
+        task_map = super().task_map
+        task_map['detect']['model'] = YOLOv10DetectionModel
+        task_map['detect']['trainer'] = WisardTrainer
+        # task_map['detect']['validator'] = WisardValidator
+        return task_map
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, fusion_pretraining=False, cfg=None, **kwargs):
+        if fusion_pretraining:
+            pretrained_model = super().from_pretrained(pretrained_model_name_or_path, **kwargs)
+            model = YOLOv10WiSARD(model=cfg, task="detect")
+            fusion_pretraining_load(model, pretrained_model.state_dict())
+            return model
+        return super().from_pretrained(pretrained_model_name_or_path, **{**kwargs, 'cfg': cfg})

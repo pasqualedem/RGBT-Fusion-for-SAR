@@ -1,12 +1,12 @@
 from copy import deepcopy
 from enum import StrEnum
-import re
 from transformers import AutoModel, ViTForImageClassification
 
 from sarfusion.experiment.utils import WrapperModule
 from sarfusion.models.experimental import attempt_load
 from sarfusion.models.utils import torch_dict_load
-from sarfusion.models.yolov10 import YOLOv10
+from sarfusion.models.utils import nc_safe_load
+from sarfusion.models.yolov10 import YOLOv10WiSARD
 from sarfusion.utils.utils import load_yaml
 
 
@@ -74,29 +74,6 @@ def build_vit_classifier(**params):
     return vit
 
 
-def nc_safe_load(model, weights, nc):
-    try:
-        result = model.load_state_dict(weights, strict=False)
-    except RuntimeError as e:
-        error_msg = str(e)
-        pattern = r"size mismatch for ([\w.]+): copying a param with shape torch.Size\((\[.*?\])\) from checkpoint, the shape in current model is torch.Size\((\[.*?\])\)"
-        matches = re.findall(pattern, error_msg)
-        for m in matches:
-            print(f"Detected mismatch in {m[0]}: {m[1]} vs {m[2]}")
-        checkpoint_shapes = [x for m in matches for x in eval(m[1])]
-        model_shapes = [x for m in matches for x in eval(m[2])]
-        diffs = [
-            diff
-            for diff in zip(checkpoint_shapes, model_shapes)
-            if diff[0] != diff[1]
-        ]
-        for diff in diffs:
-            assert (
-                diff[1] == nc
-            ), "Detected a mismatch which is not due to the number of classes"
-        print(f"Loading model with {nc} classes")
-
-
 def build_yolo_v9(cfg, nc=None, checkpoint=None, iou_t=0.2, conf_t=0.001, head={}):
     from sarfusion.models.yolo import Model as YOLOv9
 
@@ -111,12 +88,18 @@ def build_yolo_v9(cfg, nc=None, checkpoint=None, iou_t=0.2, conf_t=0.001, head={
     return model
 
 
-def build_yolo_v10(id2label, path="jameslahm/yolov10x", cfg=None):
-    pretrained_model = YOLOv10.from_pretrained(path, names=id2label).model
-    model = YOLOv10(model=cfg, names=id2label, task="detect").model
-    nc = len(id2label)
-    weights = pretrained_model.state_dict()
-    nc_safe_load(model, weights, nc)
+def build_yolo_v10(
+    pretrained_model_name_or_path=None, cfg=None, fusion_pretraining=False, nc=None
+):
+    if pretrained_model_name_or_path:
+        pretrained_model = YOLOv10WiSARD.from_pretrained(
+            pretrained_model_name_or_path,
+            fusion_pretraining=fusion_pretraining,
+            cfg=cfg,
+        ).model
+        model = YOLOv10WiSARD(model=cfg, task="detect").model
+        weights = pretrained_model.state_dict()
+        nc_safe_load(model, weights, nc)
     return model
 
 

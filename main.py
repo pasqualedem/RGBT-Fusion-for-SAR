@@ -71,7 +71,7 @@ def run(parameters):
     "--parameters", default="parameters.yaml", help="Path to the parameters file"
 )
 def yolo(parameters):
-    from sarfusion.train import yolo_train
+    from sarfusion.experiment.run import yolo_train
     yolo_train(parameters)
     
     

@@ -473,7 +473,6 @@ class WiSARDYOLODataset(YOLODataset):
                 load_dataset_cache_file(cache_path),
                 True,
             )  # attempt to load a *.cache file
-            raise FileNotFoundError()
             assert cache["version"] == DATASET_CACHE_VERSION  # matches current version
             assert cache["hash"] == get_hash(
                 self.label_files + self.im_files

@@ -67,7 +67,10 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "yolo"
+                "experiment",
+                "--yolo",
+                "--parameters",
+                "parameters/YOLO/4.yolofusion.yaml"
             ]
         },
         {

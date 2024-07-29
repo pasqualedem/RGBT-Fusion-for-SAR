@@ -1,14 +1,19 @@
 # Ultralytics YOLO 🚀, AGPL-3.0 license
 # Default training settings and hyperparameters for medium-augmentation COCO training
 experiment:
-
+  continue_with_errors: False
+  
 parameters:
   task: [detect] # (str) YOLO task, i.e. detect, segment, classify, pose
   mode: [train] # (str) YOLO mode, i.e. train, val, predict, export, track, benchmark
 
   # Train settings -------------------------------------------------------------------------------------------------------
-  model: 
-    pretrained_model_name_or_path: ['jameslahm/yolov10s', 'jameslahm/yolov10m'] # (str, optional) path to model file, i.e. yolov8n.pt, yolov8n.yaml
+  model:
+    name: [yolov10]
+    params:
+      pretrained_model_name_or_path: ['jameslahm/yolov10s'] # (str, optional) path to model file, i.e. yolov8n.pt, yolov8n.yaml
+      cfg: [cfg/yolofusion-s.yaml] 
+      fusion_pretraining: [True]
   data: [wisard.yaml] # (str, optional) path to data file, i.e. coco128.yaml
   epochs: [100] # (int) number of epochs to train for
   time: # (float, optional) number of hours to train for, overrides epochs if supplied
@@ -119,4 +124,3 @@ parameters:
   crop_fraction: [1.0] # (float) image crop fraction for classification evaluation/inference (0-1)
 
 other_grids:
-
