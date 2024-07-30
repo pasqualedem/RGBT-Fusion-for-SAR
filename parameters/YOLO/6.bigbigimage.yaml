@@ -17,7 +17,7 @@ parameters:
   time: # (float, optional) number of hours to train for, overrides epochs if supplied
   patience: [100] # (int) epochs to wait for no observable improvement for early stopping of training
   batch: [16] # (int) number of images per batch (-1 for AutoBatch)
-  imgsz: [1024] # (int | list) input images size as int for train and val modes, or list[w,h] for predict and export modes
+  imgsz: [1600] # (int | list) input images size as int for train and val modes, or list[w,h] for predict and export modes
   save: [True] # (bool) save train checkpoints and predict results
   save_period: [5] # (int) Save checkpoint every x epochs (disabled if < 1)
   val_period: [1] # (int) Validation every x epochs
@@ -25,7 +25,7 @@ parameters:
   device: # (int | str | list, optional) device to run on, i.e. cuda device=0 or device=0,1,2,3 or device=cpu
   workers: [8] # (int) number of worker threads for data loading (per RANK if DDP)
   project: [SarYOLO] # (str, optional) project name
-  name: [Pretraining] # (str, optional) experiment name, results saved to 'project/name' directory
+  name: [BigBigImage] # (str, optional) experiment name, results saved to 'project/name' directory
   exist_ok: [False] # (bool) whether to overwrite existing experiment
   pretrained: [True] # (bool | str) whether to use a pretrained model (bool) or a model to load weights from (str)
   optimizer: [auto] # (str) optimizer to use, choices=[SGD, Adam, Adamax, AdamW, NAdam, RAdam, RMSProp, auto]

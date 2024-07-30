@@ -27,7 +27,7 @@ parameters:
   device: # (int | str | list, optional) device to run on, i.e. cuda device=0 or device=0,1,2,3 or device=cpu
   workers: [8] # (int) number of worker threads for data loading (per RANK if DDP)
   project: [SarYOLO] # (str, optional) project name
-  name: [YoloSM] # (str, optional) experiment name, results saved to 'project/name' directory
+  name: [YoloFusion] # (str, optional) experiment name, results saved to 'project/name' directory
   exist_ok: [False] # (bool) whether to overwrite existing experiment
   pretrained: [True] # (bool | str) whether to use a pretrained model (bool) or a model to load weights from (str)
   optimizer: [auto] # (str) optimizer to use, choices=[SGD, Adam, Adamax, AdamW, NAdam, RAdam, RMSProp, auto]
@@ -124,3 +124,7 @@ parameters:
   crop_fraction: [1.0] # (float) image crop fraction for classification evaluation/inference (0-1)
 
 other_grids:
+  - lr0: [0.0001]
+    lrf: [0.0001]
+  - lr0: [0.00001]
+    lrf: [0.00001]
