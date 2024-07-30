@@ -8,7 +8,6 @@ from sarfusion.data.sard import YOLODataset, download_and_clean
 from sarfusion.data.utils import build_preprocessor, is_annotation_valid
 from sarfusion.data.wisard import MISSING_ANNOTATIONS, VIS, IR, VIS_IR
 from sarfusion.models import build_model
-from sarfusion.utils.structures import DataDict
 from sarfusion.utils.utils import load_yaml
 
 
@@ -67,8 +66,8 @@ def generate_pose_classification_dataset(output_dir):
         bar = tqdm(dataset, total=len(dataset))
         
         for i, data_dict in enumerate(bar):
-            image = data_dict[DataDict.IMAGES]
-            targets = data_dict[DataDict.TARGET]
+            image = data_dict.images
+            targets = data_dict.target
             cropped_images = crop_bboxes(image, targets)
             for j, (cropped_image, class_label) in enumerate(cropped_images):
                 save_path = f"{output_dir}/{subset}/{i}_{j}_{class_label}.png"
@@ -112,9 +111,9 @@ def annotate_rgb_wisard(root, model_yaml):
         bar = tqdm(dataset, total=len(dataset))
         
         for i, data_dict in enumerate(bar):
-            image = data_dict[DataDict.IMAGES]
-            targets = data_dict[DataDict.TARGET]
-            path = data_dict[DataDict.PATH]
+            image = data_dict.images
+            targets = data_dict.target
+            path = data_dict.path
             cropped_images = crop_bboxes(image, targets)
             new_targets = []
             for (cropped_image, _), target in zip(cropped_images, targets):
@@ -122,7 +121,7 @@ def annotate_rgb_wisard(root, model_yaml):
                 if not is_annotation_valid(target):
                     print(f"Invalid annotation in {path}, {target}")
                     continue
-                input_dict = {DataDict.IMAGES: cropped_image.unsqueeze(0).to(accelerator.device)}
+                input_dict = {"images": cropped_image.unsqueeze(0).to(accelerator.device)}
                 result = model(input_dict)
                 class_label = result.logits.argmax().item()
                 new_targets.append((class_label, *target[1:]))
@@ -133,7 +132,45 @@ def annotate_rgb_wisard(root, model_yaml):
             with open(gt_path, 'w') as file:
                 for target in new_targets:
                     file.write(" ".join(map(str, target)) + "\n")
+                    
+def simplify_wisard(root):
+    label_map = {
+        0: 0, # running
+        1: 0, # walking
+        2: 1, # laying_down
+        3: 2, # not_defined
+        4: 1, # seated
+        5: 0, # stands
+    }
+    vis = VIS + [f[0] for f in VIS_IR]    
             
+    for subset in vis:
+        print(f"Processing {subset}...")
+        subset_location = f"{root}/{subset}"        
+
+        dataset = YOLODataset(subset_location, transform=lambda x: x, return_path=True)
+        
+        bar = tqdm(dataset, total=len(dataset))
+        
+        for i, data_dict in enumerate(bar):
+            image = data_dict.images
+            targets = data_dict.target
+            path = data_dict.path
+            new_targets = []
+            for target in targets:
+                # Check if the annotation is valid
+                if not is_annotation_valid(target):
+                    print(f"Invalid annotation in {path}, {target}")
+                    continue
+                class_label = label_map[target[0]]
+                new_targets.append((class_label, *target[1:]))
+            # Replace the target file with the new one
+            gt_path = path.replace("images", "labels")
+            gt_path, ext = os.path.splitext(gt_path)
+            gt_path += ".txt"
+            with open(gt_path, 'w') as file:
+                for target in new_targets:
+                    file.write(" ".join(map(str, target)) + "\n")
                 
                 
 def wisard_to_yolo_dataset(root):

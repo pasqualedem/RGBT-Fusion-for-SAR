@@ -49,6 +49,17 @@
             ]
         },
         {
+            "name": "Simplify Wisard",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "simplify_wisard"
+            ]
+        },
+        {
             "name": "Experiment",
             "type": "debugpy",
             "request": "launch",
@@ -70,7 +81,7 @@
                 "experiment",
                 "--yolo",
                 "--parameters",
-                "parameters/YOLO/4.yolofusion.yaml"
+                "parameters/YOLO/6.simplified.yaml"
             ]
         },
         {

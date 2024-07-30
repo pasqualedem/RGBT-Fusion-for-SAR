@@ -32,7 +32,7 @@ def download_and_clean():
 
 class YOLODataset(Dataset):
     def __init__(self, root, transform=None, return_path=False):
-        self.annotation_paths, self.image_paths = process_image_annotation_folders(root)
+        self.image_paths, self.annotation_paths = process_image_annotation_folders(root)
         self.transform = transform
         self.return_path = return_path
 

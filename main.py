@@ -35,6 +35,11 @@ def annotate_wisard(model_yaml):
     root = "dataset/WiSARD"
     annotate_rgb_wisard(root, model_yaml)
     
+@main.command("simplify_wisard")
+def annotate_wisard():
+    from sarfusion.data.preprocess import simplify_wisard
+    root = "dataset/WiSARD"
+    simplify_wisard(root)
     
 @main.command("experiment")
 @click.option(
