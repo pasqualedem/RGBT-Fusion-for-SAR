@@ -1,5 +1,20 @@
 # RGBT-Fusion-for-SAR
 
+## Run the FastAPI server
+
+### With Docker
+
+```sh
+docker build -t sarfusion .
+docker run -it --rm -p 8000:8000 sarfusion
+```
+
+### Without Docker
+After having installed the environment
+```sh
+python main.py app
+```
+
 #### Prepare the conda environment:
 
 ```bash
