@@ -84,7 +84,7 @@ def annotate_rgb_wisard(root, model_yaml):
     model = build_model(model_params)
     model.eval()
     model = accelerator.prepare(model)
-    transform = build_preprocessor(params)
+    transform, detransform = build_preprocessor(params)
     
     
     print ("Placing -1 in all labels...")

@@ -40,8 +40,15 @@ def build_model(params):
         model = AutoModel.from_pretrained(name)
 
     if pretrained_path:
-        model.load_state_dict(torch_dict_load(pretrained_path))
-        print(f"Loaded model from {pretrained_path}")
+        try:
+            weights = torch_dict_load(pretrained_path)
+            model.load_state_dict(weights)
+            print(f"Loaded model from {pretrained_path}")
+        except RuntimeError as e:
+            print(f"Error loading model from {pretrained_path}: trying to remove 'model.'")
+            if list(weights.keys())[0].startswith("model."):
+                weights = {k[6:]: v for k, v in weights.items()}
+                model.load_state_dict(weights)
     return model
 
 

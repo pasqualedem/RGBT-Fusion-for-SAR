@@ -55,7 +55,7 @@ python3 main.py preprocess_wisard
 Move the pose classifier checkpoint to the `checkpoints` folder and run the following command:
 
 ```bash
-python3 main.py annotate_wisard
+python3 main.py annotate_wisard --model-yaml parameters/WiSARD_pose/parameters.yaml
 ```
 
 #### Download the YOLOv9 pre-trained weights:

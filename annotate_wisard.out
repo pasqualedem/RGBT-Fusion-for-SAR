@@ -1,0 +1,45 @@
+no change     /leonardo/home/userexternal/pdemarin/miniconda3/condabin/conda
+no change     /leonardo/home/userexternal/pdemarin/miniconda3/bin/conda
+no change     /leonardo/home/userexternal/pdemarin/miniconda3/bin/conda-env
+no change     /leonardo/home/userexternal/pdemarin/miniconda3/bin/activate
+no change     /leonardo/home/userexternal/pdemarin/miniconda3/bin/deactivate
+no change     /leonardo/home/userexternal/pdemarin/miniconda3/etc/profile.d/conda.sh
+no change     /leonardo/home/userexternal/pdemarin/miniconda3/etc/fish/conf.d/conda.fish
+no change     /leonardo/home/userexternal/pdemarin/miniconda3/shell/condabin/Conda.psm1
+no change     /leonardo/home/userexternal/pdemarin/miniconda3/shell/condabin/conda-hook.ps1
+no change     /leonardo/home/userexternal/pdemarin/miniconda3/lib/python3.12/site-packages/xontrib/conda.xsh
+no change     /leonardo/home/userexternal/pdemarin/miniconda3/etc/profile.d/conda.csh
+no change     /leonardo/home/userexternal/pdemarin/.bashrc
+No action taken.
+
+CondaError: Run 'conda init' before 'conda activate'
+
+Traceback (most recent call last):
+  File "/leonardo_scratch/fast/IscrC_DELIGHT/Pasquale/RGBT-Fusion-for-SAR/main.py", line 90, in <module>
+    main()
+  File "/leonardo/home/userexternal/pdemarin/miniconda3/envs/sarfusion/lib/python3.11/site-packages/click/core.py", line 1157, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/leonardo/home/userexternal/pdemarin/miniconda3/envs/sarfusion/lib/python3.11/site-packages/click/core.py", line 1078, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/leonardo/home/userexternal/pdemarin/miniconda3/envs/sarfusion/lib/python3.11/site-packages/click/core.py", line 1688, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/leonardo/home/userexternal/pdemarin/miniconda3/envs/sarfusion/lib/python3.11/site-packages/click/core.py", line 1434, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/leonardo/home/userexternal/pdemarin/miniconda3/envs/sarfusion/lib/python3.11/site-packages/click/core.py", line 783, in invoke
+    return __callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/leonardo_scratch/fast/IscrC_DELIGHT/Pasquale/RGBT-Fusion-for-SAR/main.py", line 34, in annotate_wisard
+    from sarfusion.data.preprocess import annotate_rgb_wisard
+  File "/leonardo_scratch/fast/IscrC_DELIGHT/Pasquale/RGBT-Fusion-for-SAR/sarfusion/data/__init__.py", line 5, in <module>
+    from sarfusion.data.sard import PoseClassificationDataset
+  File "/leonardo_scratch/fast/IscrC_DELIGHT/Pasquale/RGBT-Fusion-for-SAR/sarfusion/data/sard.py", line 7, in <module>
+    from sarfusion.data.utils import load_annotations, process_image_annotation_folders
+  File "/leonardo_scratch/fast/IscrC_DELIGHT/Pasquale/RGBT-Fusion-for-SAR/sarfusion/data/utils.py", line 44
+    lambda x: print(x.keys()); x["input_values"],
+                             ^
+SyntaxError: invalid syntax
+srun: error: lrdn2871: task 0: Exited with exit code 1

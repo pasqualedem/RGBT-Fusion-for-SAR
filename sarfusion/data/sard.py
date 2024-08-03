@@ -79,11 +79,11 @@ class PoseClassificationDataset(Dataset):
         if self.transform:
             img = self.transform(img)
         
-        data_dict = {
-            DataDict.IMAGES: img,
-            DataDict.TARGET: cls
-        }
+        data_dict = DataDict(
+            images=img,
+            target=cls
+        )
         if self.return_path:
-            data_dict[DataDict.PATH] = img_path
+            data_dict.path = img_path
             
         return data_dict
