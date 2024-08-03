@@ -22,6 +22,8 @@ conda env create -f environment.yml
 conda activate sarfusion
 ```
 
+## Train the model
+
 #### Download and prepare the WiSARD dataset:
 
 https://drive.google.com/file/d/1PKjGCqUszHH1nMbXUBTwPSDqRabAt_ht
@@ -58,8 +60,8 @@ Move the pose classifier checkpoint to the `checkpoints` folder and run the foll
 python3 main.py annotate_wisard --model-yaml parameters/WiSARD_pose/parameters.yaml
 ```
 
-#### Download the YOLOv9 pre-trained weights:
+#### Train the YOLOv10 model
 
 ```bash
-wget https://github.com/WongKinYiu/yolov9/releases/download/v0.1/yolov9-c-converted.pt -O checkpoints/yolov9-c-converted.pt
+python3 main.py yolo --parameters="parameters/yolo.yaml"
 ```
