@@ -41,7 +41,7 @@ def build_preprocessor(params):
             T.Compose(
                 [
                     auto_processor,
-                    lambda x: x['pixel_values'],
+                    lambda x: x['pixel_values'][0],
                     lambda x: torch.tensor(x),
                 ]
             ),

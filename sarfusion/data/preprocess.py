@@ -118,11 +118,12 @@ def annotate_rgb_wisard(root, model_yaml):
             new_targets = []
             for (cropped_image, _), target in zip(cropped_images, targets):
                 # Check if the annotation is valid
+
                 if not is_annotation_valid(target):
                     print(f"Invalid annotation in {path}, {target}")
                     continue
-                input_dict = {"images": cropped_image.unsqueeze(0).to(accelerator.device)}
-                result = model(input_dict)
+                input_dict = {"pixel_values": cropped_image.unsqueeze(0).to(accelerator.device)}
+                result = model(**input_dict)
                 class_label = result.logits.argmax().item()
                 new_targets.append((class_label, *target[1:]))
             # Replace the target file with the new one
