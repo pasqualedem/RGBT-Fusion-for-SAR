@@ -78,7 +78,7 @@ def nc_safe_load(model, weights, nc):
         ]
         for diff in diffs:
             assert (
-                diff[1] == nc
+                diff[1] == nc or diff[0] == 80 # 80 is the default number of classes of COCO
             ), "Detected a mismatch which is not due to the number of classes"
         print(f"Loading model with {nc} classes")
 

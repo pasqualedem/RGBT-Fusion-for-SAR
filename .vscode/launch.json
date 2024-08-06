@@ -81,7 +81,7 @@
                 "experiment",
                 "--yolo",
                 "--parameters",
-                "parameters/YOLO/6.simplified.yaml"
+                "parameters/YOLO/10.yolon.yaml"
             ]
         },
         {
