@@ -1,9 +1,14 @@
-from ultralytics.models.yolov10.train import YOLOv10DetectionTrainer, YOLOv10DetectionValidator
-from ultralytics.utils.plotting import plot_images
+from copy import copy
+from ultralytics.models.yolov10.train import (
+    YOLOv10DetectionTrainer,
+    YOLOv10DetectionValidator,
+)
+from ultralytics.utils import DEFAULT_CFG
+from ultralytics.cfg import cfg2dict, IterableSimpleNamespace
 from sarfusion.data.wisard import WiSARDYOLODataset
 from sarfusion.utils.general import colorstr
 from sarfusion.utils.torch_utils import de_parallel
-
+from sarfusion.utils.plots import plot_images
 
 def build_yolo_dataset(cfg, img_path, batch, data, mode="train", rect=False, stride=32):
     """Build YOLO Dataset."""
@@ -23,13 +28,27 @@ def build_yolo_dataset(cfg, img_path, batch, data, mode="train", rect=False, str
         classes=cfg.classes,
         data=data,
         fraction=cfg.fraction if mode == "train" else 1.0,
+        augment_vis_ir=cfg.augment_vis_ir,
     )
 
 
+WISARD_DEFAULT_CFG = IterableSimpleNamespace(
+    **{
+        **cfg2dict(DEFAULT_CFG),
+        "augment_vis_ir": False,
+    }
+)
+
+
 class WisardTrainer(YOLOv10DetectionTrainer):
+    def __init__(self, cfg=WISARD_DEFAULT_CFG, overrides=None, _callbacks=None):
+        super().__init__(cfg, overrides, _callbacks)
+
     def plot_training_samples(self, batch, ni):
         """Plots training samples with their annotations."""
-        im_file = [elem[0] if isinstance(elem, list) else elem for elem in batch["im_file"]]
+        im_file = [
+            elem[0] if isinstance(elem, list) else elem for elem in batch["im_file"]
+        ]
         plot_images(
             images=batch["img"],
             batch_idx=batch["batch_idx"],
@@ -39,7 +58,7 @@ class WisardTrainer(YOLOv10DetectionTrainer):
             fname=self.save_dir / f"train_batch{ni}.jpg",
             on_plot=self.on_plot,
         )
-    
+
     def build_dataset(self, img_path, mode="train", batch=None):
         """
         Build YOLO Dataset.
@@ -50,11 +69,22 @@ class WisardTrainer(YOLOv10DetectionTrainer):
             batch (int, optional): Size of batches, this is for `rect`. Defaults to None.
         """
         gs = max(int(de_parallel(self.model).stride.max() if self.model else 0), 32)
-        return build_yolo_dataset(self.args, img_path, batch, self.data, mode=mode, rect=mode == "val", stride=gs)
-    
+        return build_yolo_dataset(
+            self.args,
+            img_path,
+            batch,
+            self.data,
+            mode=mode,
+            rect=mode == "val",
+            stride=gs,
+        )
 
-    def get_model(self, cfg=None, weights=None, verbose=True):
-        """Return a YOLO detection model."""
-        model = YOLOv10DetectionModel(cfg, nc=self.data["nc"], verbose=verbose and RANK == -1)
-        if weights:
-            model.load(weights)
+    def get_validator(self):
+        """Returns a DetectionValidator for YOLO model validation."""
+        self.loss_names = "box_om", "cls_om", "dfl_om", "box_oo", "cls_oo", "dfl_oo",
+        args = cfg2dict(copy(self.args))
+        args.pop("augment_vis_ir")
+        args = IterableSimpleNamespace(**args)
+        return YOLOv10DetectionValidator(
+            self.test_loader, save_dir=self.save_dir, args=args, _callbacks=self.callbacks
+        )

@@ -221,3 +221,13 @@ def wisard_to_yolo_dataset(root):
     test_folders = [folder for folder in get_wisard_folders(folders) if  folder in TEST_FOLDERS]
     generate_wisard_filelist(root, test_folders, "test_vis_ir.txt")
     
+    folders = "all"
+    print("Generating ALL filelists...")
+    train_folders = [folder for folder in get_wisard_folders(folders) if  folder in TRAIN_FOLDERS]
+    generate_wisard_filelist(root, train_folders, "train_all.txt")
+    val_folders = [folder for folder in get_wisard_folders(folders) if  folder in VAL_FOLDERS]
+    generate_wisard_filelist(root, val_folders, "val_all.txt")
+    test_folders = [folder for folder in get_wisard_folders(folders) if  folder in TEST_FOLDERS]
+    generate_wisard_filelist(root, test_folders, "test_all.txt")
+    
+    

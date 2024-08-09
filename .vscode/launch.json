@@ -81,7 +81,7 @@
                 "experiment",
                 "--yolo",
                 "--parameters",
-                "parameters/YOLO/10.yolon.yaml"
+                "parameters/YOLO/12.VIS_IR.yaml"
             ]
         },
         {

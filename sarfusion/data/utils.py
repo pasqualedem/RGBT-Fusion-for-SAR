@@ -91,3 +91,22 @@ def process_image_annotation_folders(root):
             == image_paths[i].split("/")[-1].split(".")[0]
         )
     return image_paths, annotation_paths
+
+
+def collate_images(images):
+    IGNORE_VALUE = 114
+    images = list(images)
+    depths = [image.shape[0] for image in images]
+    if len(set(depths)) > 1:
+        for i, image in enumerate(images):
+            if image.shape[0] == 4: # RGBT
+                continue
+            elif image.shape[0] == 3: # RGB
+                padding = torch.full((1, *image.shape[1:]), IGNORE_VALUE)
+                images[i] = torch.cat([image, padding], 0)
+            elif image.shape[0] == 1: # Thermal
+                padding = torch.full((3, *image.shape[1:]), IGNORE_VALUE)
+                images[i] = torch.cat([padding, image], 0)
+            else:
+                raise ValueError(f"Unsupported image shape {image.shape}")
+    return torch.stack(images, 0)

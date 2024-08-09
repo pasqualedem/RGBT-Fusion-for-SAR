@@ -17,12 +17,7 @@ from ultralytics.utils import LOCAL_RANK, NUM_THREADS, TQDM, colorstr, is_dir_wr
 from ultralytics.utils.ops import segments2boxes
 from ultralytics.data.augment import (
     Compose,
-    Format,
-    Instances,
     LetterBox,
-    classify_augmentations,
-    classify_transforms,
-    v8_transforms,
 )
 from ultralytics.data.base import BaseDataset
 from ultralytics.data.utils import (
@@ -41,11 +36,14 @@ from ultralytics.data.dataset import (
 )
 from ultralytics.utils import LOCAL_RANK, NUM_THREADS, TQDM, colorstr, is_dir_writeable
 
+from sarfusion.data.transforms import wisard_transforms
 from sarfusion.data.utils import (
+    collate_images,
     dict_collate_fn,
     load_annotations,
     process_image_annotation_folders,
 )
+from sarfusion.data.transforms import Format
 from sarfusion.utils.dataloaders import HELP_URL, IMG_FORMATS
 from sarfusion.utils.general import xywhn2xyxy, xyxy2xywhn
 from sarfusion.utils.transforms import letterbox
@@ -196,11 +194,17 @@ def collate_rgb_ir(rgb, ir):
 
 def get_wisard_folders(folders):
     if folders == "vis":
-        folders = VIS
+        folders = VIS + [f[0] for f in VIS_IR]
     elif folders == "ir":
-        folders = IR
+        folders = IR + [f[1] for f in VIS_IR]
     elif folders == "vis_ir":
         folders = VIS_IR
+    elif folders == "all":
+        folders = VIS + IR + VIS_IR
+    elif folders == "vis_only":
+        folders = VIS
+    elif folders == "ir_only":
+        folders = IR
     return folders
 
 
@@ -464,6 +468,10 @@ def verify_image_label(args):
 
 
 class WiSARDYOLODataset(YOLODataset):
+    def __init__(self, *args, **kwargs):
+        self.augment_vis_ir = kwargs.pop("augment_vis_ir", False)
+        super().__init__(*args, **kwargs)
+    
     def get_labels(self):
         """Returns dictionary of labels for YOLO training."""
         self.label_files = img2label_paths(self.im_files)
@@ -651,6 +659,13 @@ class WiSARDYOLODataset(YOLODataset):
     def load_image(self, i, rect_mode=True):
         """Loads 1 image from dataset index 'i', returns (im, resized hw)."""
         im, f, fn = self.ims[i], self.im_files[i], self.npy_files[i]
+        if self.augment_vis_ir:
+            im = None
+            fn = None
+            choice = np.random.choice([0, 1, 2], p=[0.25, 0.25, 0.5])
+            if choice in [0, 1]:
+                f = f[choice]            
+        
         if im is None:  # not cached in RAM
             if isinstance(im, Path) and fn.exists():  # load npy
                 try:
@@ -664,6 +679,8 @@ class WiSARDYOLODataset(YOLODataset):
             else:  # read image
                 if isinstance(f, (Path, str)):
                     im = cv2.imread(f)  # BGR
+                    if "IR" in f.split(os.sep)[-3].split("_"): # is IR image
+                        im = im[:, :, :1] # only use first channel
                 else:
                     im_vis = torch.tensor(cv2.imread(f[0])).permute(2, 0, 1)  # BGR
                     im_ir = torch.tensor(cv2.imread(f[1])).permute(2, 0, 1)  # IR
@@ -702,6 +719,49 @@ class WiSARDYOLODataset(YOLODataset):
             return im, (h0, w0), im.shape[:2]
 
         return self.ims[i], self.im_hw0[i], self.im_hw[i]
+    
+    @staticmethod
+    def collate_fn(batch):
+        """Collates data samples into batches."""
+        new_batch = {}
+        keys = batch[0].keys()
+        values = list(zip(*[list(b.values()) for b in batch]))
+        for i, k in enumerate(keys):
+            value = values[i]
+            if k == "img":
+                value = collate_images(value)
+            if k in ["masks", "keypoints", "bboxes", "cls", "segments", "obb"]:
+                value = torch.cat(value, 0)
+            new_batch[k] = value
+        new_batch["batch_idx"] = list(new_batch["batch_idx"])
+        for i in range(len(new_batch["batch_idx"])):
+            new_batch["batch_idx"][i] += i  # add target image index for build_targets()
+        new_batch["batch_idx"] = torch.cat(new_batch["batch_idx"], 0)
+        return new_batch
+    
+    def build_transforms(self, hyp=None):
+        """Builds and appends transforms to the list."""
+        if self.augment:
+            hyp.mosaic = hyp.mosaic if self.augment and not self.rect else 0.0
+            hyp.mixup = hyp.mixup if self.augment and not self.rect else 0.0
+            transforms = wisard_transforms(self, self.imgsz, hyp)
+        else:
+            transforms = Compose([LetterBox(new_shape=(self.imgsz, self.imgsz), scaleup=False)])
+        transforms.append(
+            Format(
+                bbox_format="xywh",
+                normalize=True,
+                return_mask=self.use_segments,
+                return_keypoint=self.use_keypoints,
+                return_obb=self.use_obb,
+                batch_idx=True,
+                mask_ratio=hyp.mask_ratio,
+                mask_overlap=hyp.overlap_mask,
+                bgr=hyp.bgr if self.augment else 0.0,  # only affect training.
+            )
+        )
+        return transforms
+
 
 
 def generate_wisard_filelist(root, folders, filename):

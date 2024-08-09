@@ -27,6 +27,8 @@ class OptionalConv(nn.Module):
     
     
 class FusionConv(nn.Module):
+    IGNORE_VALUE = 114
+    
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True):
         super(FusionConv, self).__init__()
         self.optional_rgb = OptionalConv(3, out_channels, kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias=bias)
@@ -37,22 +39,30 @@ class FusionConv(nn.Module):
         self.bn = nn.BatchNorm2d(out_channels)
         self.act = nn.LeakyReLU(0.1, inplace=True)
         
-    def forward(self, x):
-        C = x.shape[1]
-        if C == 4:
-            rgb = x[:, :3, :, :]
-            ir = x[:, 3:, :, :]
-        elif C == 3:
-            rgb = x
-            ir = None
-        elif C == 1:
-            rgb = None
-            ir = x
-        else:
-            raise ValueError("in_channels must be 1, 3, or 4")
+    def detect_channels(x):
+        channels = []
+        for img in x:
+            if img.shape[0] == 3:
+                channels.append((img, None))
+            elif img.shape[0] == 1:
+                channels.append((None, img))
+            elif img.shape[0] == 4:
+                if img[:3, :, :].eq(FusionConv.IGNORE_VALUE).all():
+                    channels.append((None, img[3:, :, :]))
+                elif img[3:, :, :].eq(FusionConv.IGNORE_VALUE).all():
+                    channels.append((img[:3, :, :], None))
+                else:
+                    channels.append((img[:3, :, :], img[3:, :, :]))
+            else:
+                raise ValueError("Unsupported number of channels")
+        return channels
         
-        rgb = self.optional_rgb(rgb, shape=x.shape)
-        ir = self.optional_ir(ir, shape=x.shape)
+    def forward(self, x):
+        channels = FusionConv.detect_channels(x)
+        rgb, ir = zip(*channels)
+        
+        rgb = torch.cat([self.optional_rgb(item.unsqueeze(0), x.shape) for item in rgb])
+        ir = torch.cat([self.optional_ir(item.unsqueeze(0), x.shape) for item in ir])
         x = torch.cat([rgb, ir], dim=1)
         x = self.conv(x)
         x = self.bn(x)
