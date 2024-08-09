@@ -3,14 +3,12 @@ import gc
 import contextlib
 from copy import deepcopy
 import inspect
-import os
 
 import torch
 from accelerate import Accelerator
 from accelerate.logging import get_logger
 from transformers import get_scheduler as get_transformers_scheduler
 
-from sarfusion.data.wisard import build_wisard_items
 from sarfusion.utils.structures import DataDict
 from sarfusion.utils.structures import WrapperModelOutput
 from sarfusion.tracker.abstract_tracker import AbstractLogger
@@ -157,15 +155,3 @@ def unwrap_model(model):
     return model
 
 
-def generate_wisard_filelist(root, folders, filename):
-    items = build_wisard_items(root, folders)
-    images = []
-    for item in items:
-        if isinstance(item[1][0], str):
-            images.append(item[1][0])
-        else:
-            images.append(item[1][0][0] + "," + item[1][1][0])
-    with open(os.path.join(root, filename), "w") as f:
-        for item in images:
-            f.write(f"{item}\n")
-    return images

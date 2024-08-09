@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 
 from sarfusion.data.sard import YOLODataset, download_and_clean
 from sarfusion.data.utils import build_preprocessor, is_annotation_valid
-from sarfusion.data.wisard import MISSING_ANNOTATIONS, VIS, IR, VIS_IR
+from sarfusion.data.wisard import MISSING_ANNOTATIONS, TEST_FOLDERS, TRAIN_FOLDERS, VAL_FOLDERS, VIS, IR, VIS_IR, generate_wisard_filelist, get_wisard_folders
 from sarfusion.models import build_model
 from sarfusion.utils.utils import load_yaml
 
@@ -193,3 +193,31 @@ def wisard_to_yolo_dataset(root):
         print(f"Creating missing annotation {annotation}...")
         with open(f"{root}/{annotation}", 'w') as file:
             pass
+        
+    print("Generating VIS filelists...")
+    folders = "vis"
+    train_folders = [folder for folder in get_wisard_folders(folders) if  folder in TRAIN_FOLDERS]
+    generate_wisard_filelist(root, train_folders, "train_vis.txt")
+    val_folders = [folder for folder in get_wisard_folders(folders) if  folder in VAL_FOLDERS]
+    generate_wisard_filelist(root, val_folders, "val_vis.txt")
+    test_folders = [folder for folder in get_wisard_folders(folders) if  folder in TEST_FOLDERS]
+    generate_wisard_filelist(root, test_folders, "test_vis.txt")
+    
+    folders = "ir"
+    print("Generating IR filelists...")
+    train_folders = [folder for folder in get_wisard_folders(folders) if  folder in TRAIN_FOLDERS]
+    generate_wisard_filelist(root, train_folders, "train_ir.txt")
+    val_folders = [folder for folder in get_wisard_folders(folders) if  folder in VAL_FOLDERS]
+    generate_wisard_filelist(root, val_folders, "val_ir.txt")
+    test_folders = [folder for folder in get_wisard_folders(folders) if  folder in TEST_FOLDERS]
+    generate_wisard_filelist(root, test_folders, "test_ir.txt")
+    
+    folders = "vis_ir"
+    print("Generating VIS_IR filelists...")
+    train_folders = [folder for folder in get_wisard_folders(folders) if  folder in TRAIN_FOLDERS]
+    generate_wisard_filelist(root, train_folders, "train_vis_ir.txt")
+    val_folders = [folder for folder in get_wisard_folders(folders) if  folder in VAL_FOLDERS]
+    generate_wisard_filelist(root, val_folders, "val_vis_ir.txt")
+    test_folders = [folder for folder in get_wisard_folders(folders) if  folder in TEST_FOLDERS]
+    generate_wisard_filelist(root, test_folders, "test_vis_ir.txt")
+    

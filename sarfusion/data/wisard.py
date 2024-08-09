@@ -702,3 +702,17 @@ class WiSARDYOLODataset(YOLODataset):
             return im, (h0, w0), im.shape[:2]
 
         return self.ims[i], self.im_hw0[i], self.im_hw[i]
+
+
+def generate_wisard_filelist(root, folders, filename):
+    items = build_wisard_items(root, folders)
+    images = []
+    for item in items:
+        if isinstance(item[1][0], str):
+            images.append(item[1][0])
+        else:
+            images.append(item[1][0][0] + "," + item[1][1][0])
+    with open(os.path.join(root, filename), "w") as f:
+        for item in images:
+            f.write(f"{item}\n")
+    return images
