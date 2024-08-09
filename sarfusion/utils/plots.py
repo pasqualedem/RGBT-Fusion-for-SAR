@@ -753,6 +753,11 @@ def plot_images(
                 else:
                     img_type = "RGBT"
                 img = img[..., :3] # Only RGB
+        elif img.shape[2] == 3:
+            img_type = "RGB"
+        elif img.shape[2] == 1:
+            img_type = "IR"
+            img = img.repeat(3, 2)
         img_types.append(img_type)
         mosaic[y : y + h, x : x + w, :] = img
 

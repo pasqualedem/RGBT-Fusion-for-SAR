@@ -221,6 +221,24 @@ def wisard_to_yolo_dataset(root):
     test_folders = [folder for folder in get_wisard_folders(folders) if  folder in TEST_FOLDERS]
     generate_wisard_filelist(root, test_folders, "test_vis_ir.txt")
     
+    folders = "vis_all_ir_sync"
+    print("Generating VIS_ALL_IR_SYNC filelists...")
+    train_folders = [folder for folder in get_wisard_folders(folders) if  folder in TRAIN_FOLDERS]
+    generate_wisard_filelist(root, train_folders, "train_vis_all_ir_sync.txt")
+    val_folders = [folder for folder in get_wisard_folders(folders) if  folder in VAL_FOLDERS]
+    generate_wisard_filelist(root, val_folders, "val_vis_all_ir_sync.txt")
+    test_folders = [folder for folder in get_wisard_folders(folders) if  folder in TEST_FOLDERS]
+    generate_wisard_filelist(root, test_folders, "test_vis_all_ir_sync.txt")
+    
+    folders = "vis_sync_ir_all"
+    print("Generating VIS_SYNC_IR_ALL filelists...")
+    train_folders = [folder for folder in get_wisard_folders(folders) if  folder in TRAIN_FOLDERS]
+    generate_wisard_filelist(root, train_folders, "train_vis_sync_ir_all.txt")
+    val_folders = [folder for folder in get_wisard_folders(folders) if  folder in VAL_FOLDERS]
+    generate_wisard_filelist(root, val_folders, "val_vis_sync_ir_all.txt")
+    test_folders = [folder for folder in get_wisard_folders(folders) if  folder in TEST_FOLDERS]
+    generate_wisard_filelist(root, test_folders, "test_vis_sync_ir_all.txt")
+    
     folders = "all"
     print("Generating ALL filelists...")
     train_folders = [folder for folder in get_wisard_folders(folders) if  folder in TRAIN_FOLDERS]

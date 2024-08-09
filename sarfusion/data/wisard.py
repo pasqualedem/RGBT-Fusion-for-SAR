@@ -197,6 +197,10 @@ def get_wisard_folders(folders):
         folders = VIS + [f[0] for f in VIS_IR]
     elif folders == "ir":
         folders = IR + [f[1] for f in VIS_IR]
+    elif folders == "vis_all_ir_sync":
+        folders = VIS + VIS_IR
+    elif folders == "vis_sync_ir_all":
+        folders = IR + VIS_IR
     elif folders == "vis_ir":
         folders = VIS_IR
     elif folders == "all":
