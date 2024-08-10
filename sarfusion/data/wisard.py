@@ -550,18 +550,19 @@ class WiSARDYOLODataset(YOLODataset):
                         # F += [p.parent / x.lstrip(os.sep) for x in t]  # local to global path (pathlib)
                 else:
                     raise FileNotFoundError(f"{self.prefix}{p} does not exist")
-            if isinstance(f[0], tuple):
-                im_files = [
-                    (x[0].replace("/", os.sep), x[1].replace("/", os.sep))
-                    for x in f
-                    if x[0].split(".")[-1].lower() in IMG_FORMATS
-                ]
-            else:
-                im_files = sorted(
-                    x.replace("/", os.sep)
-                    for x in f
-                    if x.split(".")[-1].lower() in IMG_FORMATS
-                )
+            im_files = []
+            for x in f:        
+                if isinstance(x, tuple):
+                    if x[0].split(".")[-1].lower() in IMG_FORMATS and x[1].split(".")[-1].lower() in IMG_FORMATS:
+                        im_files.append((x[0].replace("/", os.sep), x[1].replace("/", os.sep)))
+                    else:
+                        LOGGER.warning(f"WARNING ⚠️ Skipping image pair {x} with different formats")
+                else:
+                    if x.split(".")[-1].lower() in IMG_FORMATS:
+                        im_files.append(x.replace("/", os.sep))
+                    else:
+                        LOGGER.warning(f"WARNING ⚠️ Skipping image {x} with unsupported format")
+            im_files = sorted(im_files, key=lambda x: x[0] if isinstance(x, tuple) else x)
             # self.img_files = sorted([x for x in f if x.suffix[1:].lower() in IMG_FORMATS])  # pathlib
             assert im_files, f"{self.prefix}No images found in {img_path}"
         except Exception as e:
@@ -663,7 +664,7 @@ class WiSARDYOLODataset(YOLODataset):
     def load_image(self, i, rect_mode=True):
         """Loads 1 image from dataset index 'i', returns (im, resized hw)."""
         im, f, fn = self.ims[i], self.im_files[i], self.npy_files[i]
-        if self.augment_vis_ir:
+        if self.augment_vis_ir and isinstance(f, tuple):
             im = None
             fn = None
             choice = np.random.choice([0, 1, 2], p=[0.25, 0.25, 0.5])

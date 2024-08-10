@@ -60,9 +60,19 @@ class FusionConv(nn.Module):
     def forward(self, x):
         channels = FusionConv.detect_channels(x)
         rgb, ir = zip(*channels)
+        rgb = [item.unsqueeze(0) if item is not None else None for item in rgb]
+        ir = [item.unsqueeze(0) if item is not None else None for item in ir]
         
-        rgb = torch.cat([self.optional_rgb(item.unsqueeze(0), x.shape) for item in rgb])
-        ir = torch.cat([self.optional_ir(item.unsqueeze(0), x.shape) for item in ir])
+        if all(item is not None for item in rgb):
+            rgb = torch.cat(rgb)
+            rgb = self.optional_rgb(rgb, x.shape)
+        else:
+            rgb = torch.cat([self.optional_rgb(item, (1,) + x.shape[1:]) for item in rgb])
+        if all(item is not None for item in ir):
+            ir = torch.cat(ir)
+            ir = self.optional_ir(ir, x.shape)
+        else:
+            ir = torch.cat([self.optional_ir(item, (1,) + x.shape[1:]) for item in ir])
         x = torch.cat([rgb, ir], dim=1)
         x = self.conv(x)
         x = self.bn(x)

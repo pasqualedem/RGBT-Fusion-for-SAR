@@ -25,7 +25,7 @@ parameters:
   val_period: [1] # (int) Validation every x epochs
   cache: [False] # (bool) True/ram, disk or False. Use cache for data loading
   device: # (int | str | list, optional) device to run on, i.e. cuda device=0 or device=0,1,2,3 or device=cpu
-  workers: [8] # (int) number of worker threads for data loading (per RANK if DDP)
+  workers: [0] # (int) number of worker threads for data loading (per RANK if DDP)
   project: [SarYOLO] # (str, optional) project name
   name: [VIS_ALL_IR_SYNC] # (str, optional) experiment name, results saved to 'project/name' directory
   exist_ok: [False] # (bool) whether to overwrite existing experiment
