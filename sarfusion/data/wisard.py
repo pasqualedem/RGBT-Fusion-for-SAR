@@ -53,18 +53,29 @@ from sarfusion.data.yolo import YOLODataset
 
 
 NO_LABELS = [
-    "210812_Hannegan_Enterprise_VIS_0055",
     "210924_FHL_Enterprise_VIS_0564",
     "210924_FHL_Enterprise_VIS_0566",
-    "210924_FHL_Enterprise_IR_0410",
-    "210924_FHL_Enterprise_VIS_0409",
+    "210812_Hannegan_Enterprise_VIS_0055",
     "210812_Hannegan_Enterprise_IR_0056",
-    "210529_Carnation_Enterprise_IR_0026",
-    "210812_Hannegan_Enterprise_IR_0054",
+    "210924_FHL_Enterprise_VIS_0409",
+    "210924_FHL_Enterprise_IR_0410",
     "210812_Hannegan_Enterprise_VIS_0053",
+    "210812_Hannegan_Enterprise_IR_0054",
     "210924_FHL_Enterprise_VIS_0403",
+    "210529_Carnation_Enterprise_IR_0026",
     "210924_FHL_Enterprise_IR_0408",
     "210924_FHL_Enterprise_IR_0127",
+]
+
+ONLY_VIS_LABELS = [
+    "210529_Carnation_Enterprise_IR_0026",
+    "210924_FHL_Enterprise_IR_0127",
+    "210924_FHL_Enterprise_IR_0408",
+]
+
+ONLY_IR_LABELS = [
+    "210924_FHL_Enterprise_VIS_0564",
+    "210924_FHL_Enterprise_VIS_0566",
 ]
 
 VIS = [
@@ -120,23 +131,53 @@ IR = [
 ]
 
 VIS_IR = [
-    ("210417_MtErie_Enterprise_VIS_0003", "210417_MtErie_Enterprise_IR_0004"),
-    ("210417_MtErie_Enterprise_VIS_0005", "210417_MtErie_Enterprise_IR_0006"),
-    ("210417_MtErie_Enterprise_VIS_0007", "210417_MtErie_Enterprise_IR_0008"),
-    ("210529_Carnation_Enterprise_VIS_0023", "210529_Carnation_Enterprise_IR_0024"),
-    ("210529_Carnation_Enterprise_VIS_0025", "210529_Carnation_Enterprise_IR_0026"),
+    (
+        "210417_MtErie_Enterprise_VIS_0003",
+        "210417_MtErie_Enterprise_IR_0004",
+    ),  # Synced (test)
+    (
+        "210417_MtErie_Enterprise_VIS_0005",
+        "210417_MtErie_Enterprise_IR_0006",
+    ),  # Synced (test)
+    (
+        "210417_MtErie_Enterprise_VIS_0007",
+        "210417_MtErie_Enterprise_IR_0008",
+    ),  # Synced (test)
+    (
+        "210529_Carnation_Enterprise_VIS_0023",
+        "210529_Carnation_Enterprise_IR_0024",
+    ),  # RGB is zoomed in (val)
+    (
+        "210529_Carnation_Enterprise_VIS_0025",
+        "210529_Carnation_Enterprise_IR_0026",
+    ),  # Synced (val)
     ("210812_Hannegan_Enterprise_VIS_0053", "210812_Hannegan_Enterprise_IR_0054"),
     ("210812_Hannegan_Enterprise_VIS_0055", "210812_Hannegan_Enterprise_IR_0056"),
-    ("210924_FHL_Enterprise_VIS_0126", "210924_FHL_Enterprise_IR_0127"),
-    ("210924_FHL_Enterprise_VIS_0134", "210924_FHL_Enterprise_IR_0135"),
-    ("210924_FHL_Enterprise_VIS_0401", "210924_FHL_Enterprise_IR_0402"),
+    (
+        "210924_FHL_Enterprise_VIS_0126",
+        "210924_FHL_Enterprise_IR_0127",
+    ),  # Synced (train)
+    (
+        "210924_FHL_Enterprise_VIS_0134",
+        "210924_FHL_Enterprise_IR_0135",
+    ),  # Synced (train)
+    (
+        "210924_FHL_Enterprise_VIS_0401",
+        "210924_FHL_Enterprise_IR_0402",
+    ),  # Synced (train)
     ("210924_FHL_Enterprise_VIS_0403", "210924_FHL_Enterprise_IR_0404"),
-    ("210924_FHL_Enterprise_VIS_0405", "210924_FHL_Enterprise_IR_0406"),
-    ("210924_FHL_Enterprise_VIS_0407", "210924_FHL_Enterprise_IR_0408"),
+    (
+        "210924_FHL_Enterprise_VIS_0405",
+        "210924_FHL_Enterprise_IR_0406",
+    ),  # Synced (train)
+    (
+        "210924_FHL_Enterprise_VIS_0407",
+        "210924_FHL_Enterprise_IR_0408",
+    ),  # Synced (train)
     ("210924_FHL_Enterprise_VIS_0409", "210924_FHL_Enterprise_IR_0410"),
     ("210924_FHL_Enterprise_VIS_0564", "210924_FHL_Enterprise_IR_0565"),
     ("210924_FHL_Enterprise_VIS_0566", "210924_FHL_Enterprise_IR_0567"),
-    ("220109_Baker_Enterprise_VIS_1", "220109_Baker_Enterprise_IR_1"),
+    ("220109_Baker_Enterprise_VIS_1", "220109_Baker_Enterprise_IR_1"),  # Synced (train)
 ]
 
 MISSING_ANNOTATIONS = [
@@ -149,7 +190,12 @@ VAL_VIS = [0, 6, 7, 13, 14]
 TEST_VIS = [15, 16, 17, 18, 19, 20, 21]
 
 TRAIN_VIS_IR = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-VAL_VIS_IR = [3, 4, 5, 6]
+VAL_VIS_IR = [
+    3,
+    # 4, RGB is zoomed in
+    5,
+    6,
+]
 TEST_VIS_IR = [0, 1, 2]
 
 TRAIN_IR = [9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23]
@@ -227,21 +273,42 @@ def build_wisard_items(root, folders):
         for folder in ir_datasets
     ]
     ir_items = [(IR_ITEM, item) for dataset in ir_items for item in dataset]
-    multi_modality_rgb_items = [
-        list(zip(*process_image_annotation_folders(os.path.join(root, folder[0]))))
-        for folder in multi_modality_datasets
-    ]
-    multi_modality_ir_items = [
-        list(zip(*process_image_annotation_folders(os.path.join(root, folder[1]))))
-        for folder in multi_modality_datasets
-    ]
-    multi_modality_items = [
-        (MULTI_MODALITY_ITEM, (rgb_item, ir_item))
-        for rgb_dataset, ir_dataset in zip(
-            multi_modality_rgb_items, multi_modality_ir_items
+    # multi_modality_rgb_items = [
+    #     list(zip(*process_image_annotation_folders(os.path.join(root, folder[0]))))
+    #     for folder in multi_modality_datasets
+    # ]
+    multi_modality_rgb_items = []
+    for folder in multi_modality_datasets:
+        image_paths, annotations_paths = process_image_annotation_folders(
+            os.path.join(root, folder[0])
         )
-        for rgb_item, ir_item in zip(rgb_dataset, ir_dataset)
-    ]
+        multi_modality_rgb_items.append(list(zip(*(image_paths, annotations_paths))))
+
+    # multi_modality_ir_items = [
+    #     list(zip(*process_image_annotation_folders(os.path.join(root, folder[1]))))
+    #     for folder in multi_modality_datasets
+    # ]
+    multi_modality_ir_items = []
+    for folder in multi_modality_datasets:
+        image_paths, annotations_paths = process_image_annotation_folders(
+            os.path.join(root, folder[1])
+        )
+        if len(annotations_paths) == 0:
+            annotations_paths = [""] * len(image_paths)
+        multi_modality_ir_items.append(list(zip(*(image_paths, annotations_paths))))
+    # multi_modality_items = [
+    #     (MULTI_MODALITY_ITEM, (rgb_item, ir_item))
+    #     for rgb_dataset, ir_dataset in zip(
+    #         multi_modality_rgb_items, multi_modality_ir_items
+    #     )
+    #     for rgb_item, ir_item in zip(rgb_dataset, ir_dataset)
+    # ]
+    multi_modality_items = []
+    for rgb_dataset, ir_dataset in zip(
+        multi_modality_rgb_items, multi_modality_ir_items
+    ):
+        for rgb_item, ir_item in zip(rgb_dataset, ir_dataset):
+            multi_modality_items.append((MULTI_MODALITY_ITEM, (rgb_item, ir_item)))
 
     return rgb_items + ir_items + multi_modality_items
 
@@ -380,7 +447,11 @@ def get_hash(paths):
             else os.path.getsize(p[0]) + os.path.getsize(p[1])
         )
         for p in paths
-        if (isinstance(p, str) and os.path.exists(p) or (os.path.exists(p[0]) and os.path.exists(p[1])))
+        if (
+            isinstance(p, str)
+            and os.path.exists(p)
+            or (os.path.exists(p[0]) and os.path.exists(p[1]))
+        )
     )  # sizes
     h = hashlib.sha256(str(size).encode())  # hash sizes
     hash_paths = []
@@ -414,7 +485,9 @@ def verify_image_label(args):
                 with open(im_file, "rb") as f:
                     f.seek(-2, 2)
                     if f.read() != b"\xff\xd9":  # corrupt JPEG
-                        ImageOps.exif_transpose(Image.open(im_file)).save(im_file, "JPEG", subsampling=0, quality=100)
+                        ImageOps.exif_transpose(Image.open(im_file)).save(
+                            im_file, "JPEG", subsampling=0, quality=100
+                        )
                         msg = f"{prefix}WARNING ⚠️ {im_file}: corrupt JPEG restored and saved"
         if len(im_files) == 1:
             im_files = im_files[0]
@@ -426,18 +499,28 @@ def verify_image_label(args):
                 lb = [x.split() for x in f.read().strip().splitlines() if len(x)]
                 if any(len(x) > 6 for x in lb) and (not keypoint):  # is segment
                     classes = np.array([x[0] for x in lb], dtype=np.float32)
-                    segments = [np.array(x[1:], dtype=np.float32).reshape(-1, 2) for x in lb]  # (cls, xy1...)
-                    lb = np.concatenate((classes.reshape(-1, 1), segments2boxes(segments)), 1)  # (cls, xywh)
+                    segments = [
+                        np.array(x[1:], dtype=np.float32).reshape(-1, 2) for x in lb
+                    ]  # (cls, xy1...)
+                    lb = np.concatenate(
+                        (classes.reshape(-1, 1), segments2boxes(segments)), 1
+                    )  # (cls, xywh)
                 lb = np.array(lb, dtype=np.float32)
             nl = len(lb)
             if nl:
                 if keypoint:
-                    assert lb.shape[1] == (5 + nkpt * ndim), f"labels require {(5 + nkpt * ndim)} columns each"
+                    assert lb.shape[1] == (
+                        5 + nkpt * ndim
+                    ), f"labels require {(5 + nkpt * ndim)} columns each"
                     points = lb[:, 5:].reshape(-1, ndim)[:, :2]
                 else:
-                    assert lb.shape[1] == 5, f"labels require 5 columns, {lb.shape[1]} columns detected"
+                    assert (
+                        lb.shape[1] == 5
+                    ), f"labels require 5 columns, {lb.shape[1]} columns detected"
                     points = lb[:, 1:]
-                assert points.max() <= 1, f"non-normalized or out of bounds coordinates {points[points > 1]}"
+                assert (
+                    points.max() <= 1
+                ), f"non-normalized or out of bounds coordinates {points[points > 1]}"
                 assert lb.min() >= 0, f"negative label values {lb[lb < 0]}"
 
                 # All labels
@@ -454,15 +537,21 @@ def verify_image_label(args):
                     msg = f"{prefix}WARNING ⚠️ {im_files}: {nl - len(i)} duplicate labels removed"
             else:
                 ne = 1  # label empty
-                lb = np.zeros((0, (5 + nkpt * ndim) if keypoint else 5), dtype=np.float32)
+                lb = np.zeros(
+                    (0, (5 + nkpt * ndim) if keypoint else 5), dtype=np.float32
+                )
         else:
             nm = 1  # label missing
             lb = np.zeros((0, (5 + nkpt * ndim) if keypoints else 5), dtype=np.float32)
         if keypoint:
             keypoints = lb[:, 5:].reshape(-1, nkpt, ndim)
             if ndim == 2:
-                kpt_mask = np.where((keypoints[..., 0] < 0) | (keypoints[..., 1] < 0), 0.0, 1.0).astype(np.float32)
-                keypoints = np.concatenate([keypoints, kpt_mask[..., None]], axis=-1)  # (nl, nkpt, 3)
+                kpt_mask = np.where(
+                    (keypoints[..., 0] < 0) | (keypoints[..., 1] < 0), 0.0, 1.0
+                ).astype(np.float32)
+                keypoints = np.concatenate(
+                    [keypoints, kpt_mask[..., None]], axis=-1
+                )  # (nl, nkpt, 3)
         lb = lb[:, :5]
         return im_files, lb, shape, segments, keypoints, nm, nf, ne, nc, msg
     except Exception as e:
@@ -475,7 +564,7 @@ class WiSARDYOLODataset(YOLODataset):
     def __init__(self, *args, **kwargs):
         self.augment_vis_ir = kwargs.pop("augment_vis_ir", False)
         super().__init__(*args, **kwargs)
-    
+
     def get_labels(self):
         """Returns dictionary of labels for YOLO training."""
         self.label_files = img2label_paths(self.im_files)
@@ -551,18 +640,29 @@ class WiSARDYOLODataset(YOLODataset):
                 else:
                     raise FileNotFoundError(f"{self.prefix}{p} does not exist")
             im_files = []
-            for x in f:        
+            for x in f:
                 if isinstance(x, tuple):
-                    if x[0].split(".")[-1].lower() in IMG_FORMATS and x[1].split(".")[-1].lower() in IMG_FORMATS:
-                        im_files.append((x[0].replace("/", os.sep), x[1].replace("/", os.sep)))
+                    if (
+                        x[0].split(".")[-1].lower() in IMG_FORMATS
+                        and x[1].split(".")[-1].lower() in IMG_FORMATS
+                    ):
+                        im_files.append(
+                            (x[0].replace("/", os.sep), x[1].replace("/", os.sep))
+                        )
                     else:
-                        LOGGER.warning(f"WARNING ⚠️ Skipping image pair {x} with different formats")
+                        LOGGER.warning(
+                            f"WARNING ⚠️ Skipping image pair {x} with different formats"
+                        )
                 else:
                     if x.split(".")[-1].lower() in IMG_FORMATS:
                         im_files.append(x.replace("/", os.sep))
                     else:
-                        LOGGER.warning(f"WARNING ⚠️ Skipping image {x} with unsupported format")
-            im_files = sorted(im_files, key=lambda x: x[0] if isinstance(x, tuple) else x)
+                        LOGGER.warning(
+                            f"WARNING ⚠️ Skipping image {x} with unsupported format"
+                        )
+            im_files = sorted(
+                im_files, key=lambda x: x[0] if isinstance(x, tuple) else x
+            )
             # self.img_files = sorted([x for x in f if x.suffix[1:].lower() in IMG_FORMATS])  # pathlib
             assert im_files, f"{self.prefix}No images found in {img_path}"
         except Exception as e:
@@ -669,8 +769,8 @@ class WiSARDYOLODataset(YOLODataset):
             fn = None
             choice = np.random.choice([0, 1, 2], p=[0.25, 0.25, 0.5])
             if choice in [0, 1]:
-                f = f[choice]            
-        
+                f = f[choice]
+
         if im is None:  # not cached in RAM
             if isinstance(im, Path) and fn.exists():  # load npy
                 try:
@@ -684,8 +784,8 @@ class WiSARDYOLODataset(YOLODataset):
             else:  # read image
                 if isinstance(f, (Path, str)):
                     im = cv2.imread(f)  # BGR
-                    if "IR" in f.split(os.sep)[-3].split("_"): # is IR image
-                        im = im[:, :, :1] # only use first channel
+                    if "IR" in f.split(os.sep)[-3].split("_"):  # is IR image
+                        im = im[:, :, :1]  # only use first channel
                 else:
                     im_vis = torch.tensor(cv2.imread(f[0])).permute(2, 0, 1)  # BGR
                     im_ir = torch.tensor(cv2.imread(f[1])).permute(2, 0, 1)  # IR
@@ -724,7 +824,7 @@ class WiSARDYOLODataset(YOLODataset):
             return im, (h0, w0), im.shape[:2]
 
         return self.ims[i], self.im_hw0[i], self.im_hw[i]
-    
+
     @staticmethod
     def collate_fn(batch):
         """Collates data samples into batches."""
@@ -743,7 +843,7 @@ class WiSARDYOLODataset(YOLODataset):
             new_batch["batch_idx"][i] += i  # add target image index for build_targets()
         new_batch["batch_idx"] = torch.cat(new_batch["batch_idx"], 0)
         return new_batch
-    
+
     def build_transforms(self, hyp=None):
         """Builds and appends transforms to the list."""
         if self.augment:
@@ -751,7 +851,9 @@ class WiSARDYOLODataset(YOLODataset):
             hyp.mixup = hyp.mixup if self.augment and not self.rect else 0.0
             transforms = wisard_transforms(self, self.imgsz, hyp)
         else:
-            transforms = Compose([LetterBox(new_shape=(self.imgsz, self.imgsz), scaleup=False)])
+            transforms = Compose(
+                [LetterBox(new_shape=(self.imgsz, self.imgsz), scaleup=False)]
+            )
         transforms.append(
             Format(
                 bbox_format="xywh",
@@ -766,7 +868,6 @@ class WiSARDYOLODataset(YOLODataset):
             )
         )
         return transforms
-
 
 
 def generate_wisard_filelist(root, folders, filename):

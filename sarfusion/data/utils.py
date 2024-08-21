@@ -85,6 +85,13 @@ def process_image_annotation_folders(root):
         [os.path.join(annotation_path, ann) for ann in annotations]
     )
     image_paths = sorted([os.path.join(image_path, img) for img in images])
+    if len(annotation_paths) != len(image_paths):
+        if len(annotation_paths) == 0:
+            print(f"WARNING: No annotations found in {annotation_path}")
+        else:
+            raise ValueError(
+                f"Number of annotations ({len(annotation_paths)}) does not match number of images ({len(image_paths)})"
+            )
     for i in range(len(annotation_paths)):
         assert (
             annotation_paths[i].split("/")[-1].split(".")[0]
