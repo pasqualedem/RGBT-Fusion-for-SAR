@@ -53,18 +53,29 @@ from sarfusion.data.yolo import YOLODataset
 
 
 NO_LABELS = [
-    "210812_Hannegan_Enterprise_VIS_0055",
     "210924_FHL_Enterprise_VIS_0564",
     "210924_FHL_Enterprise_VIS_0566",
-    "210924_FHL_Enterprise_IR_0410",
-    "210924_FHL_Enterprise_VIS_0409",
+    "210812_Hannegan_Enterprise_VIS_0055",
     "210812_Hannegan_Enterprise_IR_0056",
-    "210529_Carnation_Enterprise_IR_0026",
-    "210812_Hannegan_Enterprise_IR_0054",
+    "210924_FHL_Enterprise_VIS_0409",
+    "210924_FHL_Enterprise_IR_0410",
     "210812_Hannegan_Enterprise_VIS_0053",
+    "210812_Hannegan_Enterprise_IR_0054",
     "210924_FHL_Enterprise_VIS_0403",
+    "210529_Carnation_Enterprise_IR_0026",
     "210924_FHL_Enterprise_IR_0408",
     "210924_FHL_Enterprise_IR_0127",
+]
+
+ONLY_VIS_LABELS = [
+    "210529_Carnation_Enterprise_IR_0026",
+    "210924_FHL_Enterprise_IR_0127",
+    "210924_FHL_Enterprise_IR_0408",
+]
+
+ONLY_IR_LABELS = [
+    "210924_FHL_Enterprise_VIS_0564",
+    "210924_FHL_Enterprise_VIS_0566",
 ]
 
 VIS_ONLY = [
@@ -120,23 +131,53 @@ IR_ONLY = [
 ]
 
 VIS_IR = [
-    ("210417_MtErie_Enterprise_VIS_0003", "210417_MtErie_Enterprise_IR_0004"),
-    ("210417_MtErie_Enterprise_VIS_0005", "210417_MtErie_Enterprise_IR_0006"),
-    ("210417_MtErie_Enterprise_VIS_0007", "210417_MtErie_Enterprise_IR_0008"),
-    ("210529_Carnation_Enterprise_VIS_0023", "210529_Carnation_Enterprise_IR_0024"),
-    ("210529_Carnation_Enterprise_VIS_0025", "210529_Carnation_Enterprise_IR_0026"),
+    (
+        "210417_MtErie_Enterprise_VIS_0003",
+        "210417_MtErie_Enterprise_IR_0004",
+    ),  # Synced (test)
+    (
+        "210417_MtErie_Enterprise_VIS_0005",
+        "210417_MtErie_Enterprise_IR_0006",
+    ),  # Synced (test)
+    (
+        "210417_MtErie_Enterprise_VIS_0007",
+        "210417_MtErie_Enterprise_IR_0008",
+    ),  # Synced (test)
+    (
+        "210529_Carnation_Enterprise_VIS_0023",
+        "210529_Carnation_Enterprise_IR_0024",
+    ),  # RGB is zoomed in (val)
+    (
+        "210529_Carnation_Enterprise_VIS_0025",
+        "210529_Carnation_Enterprise_IR_0026",
+    ),  # Synced (val)
     ("210812_Hannegan_Enterprise_VIS_0053", "210812_Hannegan_Enterprise_IR_0054"),
     ("210812_Hannegan_Enterprise_VIS_0055", "210812_Hannegan_Enterprise_IR_0056"),
-    ("210924_FHL_Enterprise_VIS_0126", "210924_FHL_Enterprise_IR_0127"),
-    ("210924_FHL_Enterprise_VIS_0134", "210924_FHL_Enterprise_IR_0135"),
-    ("210924_FHL_Enterprise_VIS_0401", "210924_FHL_Enterprise_IR_0402"),
+    (
+        "210924_FHL_Enterprise_VIS_0126",
+        "210924_FHL_Enterprise_IR_0127",
+    ),  # Synced (train)
+    (
+        "210924_FHL_Enterprise_VIS_0134",
+        "210924_FHL_Enterprise_IR_0135",
+    ),  # Synced (train)
+    (
+        "210924_FHL_Enterprise_VIS_0401",
+        "210924_FHL_Enterprise_IR_0402",
+    ),  # Synced (train)
     ("210924_FHL_Enterprise_VIS_0403", "210924_FHL_Enterprise_IR_0404"),
-    ("210924_FHL_Enterprise_VIS_0405", "210924_FHL_Enterprise_IR_0406"),
-    ("210924_FHL_Enterprise_VIS_0407", "210924_FHL_Enterprise_IR_0408"),
+    (
+        "210924_FHL_Enterprise_VIS_0405",
+        "210924_FHL_Enterprise_IR_0406",
+    ),  # Synced (train)
+    (
+        "210924_FHL_Enterprise_VIS_0407",
+        "210924_FHL_Enterprise_IR_0408",
+    ),  # Synced (train)
     ("210924_FHL_Enterprise_VIS_0409", "210924_FHL_Enterprise_IR_0410"),
     ("210924_FHL_Enterprise_VIS_0564", "210924_FHL_Enterprise_IR_0565"),
     ("210924_FHL_Enterprise_VIS_0566", "210924_FHL_Enterprise_IR_0567"),
-    ("220109_Baker_Enterprise_VIS_1", "220109_Baker_Enterprise_IR_1"),
+    ("220109_Baker_Enterprise_VIS_1", "220109_Baker_Enterprise_IR_1"),  # Synced (train)
 ]
 VIS = VIS_ONLY + [f[0] for f in VIS_IR]
 IR = IR_ONLY + [f[1] for f in VIS_IR]
@@ -151,7 +192,12 @@ VAL_VIS = [0, 6, 7, 13, 14]
 TEST_VIS = [15, 16, 17, 18, 19, 20, 21]
 
 TRAIN_VIS_IR = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-VAL_VIS_IR = [3, 4, 5, 6]
+VAL_VIS_IR = [
+    3,
+    # 4, RGB is zoomed in
+    5,
+    6,
+]
 TEST_VIS_IR = [0, 1, 2]
 
 # Remove NO_LABELS from VIS_IR
@@ -257,21 +303,42 @@ def build_wisard_items(root, folders):
         for folder in ir_datasets
     ]
     ir_items = [(IR_ITEM, item) for dataset in ir_items for item in dataset]
-    multi_modality_rgb_items = [
-        list(zip(*process_image_annotation_folders(os.path.join(root, folder[0]))))
-        for folder in multi_modality_datasets
-    ]
-    multi_modality_ir_items = [
-        list(zip(*process_image_annotation_folders(os.path.join(root, folder[1]))))
-        for folder in multi_modality_datasets
-    ]
-    multi_modality_items = [
-        (MULTI_MODALITY_ITEM, (rgb_item, ir_item))
-        for rgb_dataset, ir_dataset in zip(
-            multi_modality_rgb_items, multi_modality_ir_items
+    # multi_modality_rgb_items = [
+    #     list(zip(*process_image_annotation_folders(os.path.join(root, folder[0]))))
+    #     for folder in multi_modality_datasets
+    # ]
+    multi_modality_rgb_items = []
+    for folder in multi_modality_datasets:
+        image_paths, annotations_paths = process_image_annotation_folders(
+            os.path.join(root, folder[0])
         )
-        for rgb_item, ir_item in zip(rgb_dataset, ir_dataset)
-    ]
+        multi_modality_rgb_items.append(list(zip(*(image_paths, annotations_paths))))
+
+    # multi_modality_ir_items = [
+    #     list(zip(*process_image_annotation_folders(os.path.join(root, folder[1]))))
+    #     for folder in multi_modality_datasets
+    # ]
+    multi_modality_ir_items = []
+    for folder in multi_modality_datasets:
+        image_paths, annotations_paths = process_image_annotation_folders(
+            os.path.join(root, folder[1])
+        )
+        if len(annotations_paths) == 0:
+            annotations_paths = [""] * len(image_paths)
+        multi_modality_ir_items.append(list(zip(*(image_paths, annotations_paths))))
+    # multi_modality_items = [
+    #     (MULTI_MODALITY_ITEM, (rgb_item, ir_item))
+    #     for rgb_dataset, ir_dataset in zip(
+    #         multi_modality_rgb_items, multi_modality_ir_items
+    #     )
+    #     for rgb_item, ir_item in zip(rgb_dataset, ir_dataset)
+    # ]
+    multi_modality_items = []
+    for rgb_dataset, ir_dataset in zip(
+        multi_modality_rgb_items, multi_modality_ir_items
+    ):
+        for rgb_item, ir_item in zip(rgb_dataset, ir_dataset):
+            multi_modality_items.append((MULTI_MODALITY_ITEM, (rgb_item, ir_item)))
 
     return rgb_items + ir_items + multi_modality_items
 
