@@ -67,7 +67,7 @@ NO_LABELS = [
     "210924_FHL_Enterprise_IR_0127",
 ]
 
-VIS = [
+VIS_ONLY = [
     "200321_Baker_Phantom_VIS",
     "200402_Carnation_Inspire_VIS",
     "200402_Karen_Inspire_VIS",
@@ -92,7 +92,7 @@ VIS = [
     "210327_Airfield_FLIR_VIS_4",
 ]
 
-IR = [
+IR_ONLY = [
     "200704_Baker_FLIR_IR_1",
     "200704_Baker_FLIR_IR_2",
     "200910_Carnation_FLIR_IR_1",
@@ -138,6 +138,8 @@ VIS_IR = [
     ("210924_FHL_Enterprise_VIS_0566", "210924_FHL_Enterprise_IR_0567"),
     ("220109_Baker_Enterprise_VIS_1", "220109_Baker_Enterprise_IR_1"),
 ]
+VIS = VIS_ONLY + [f[0] for f in VIS_IR]
+IR = IR_ONLY + [f[1] for f in VIS_IR]
 
 MISSING_ANNOTATIONS = [
     "210924_FHL_Enterprise_VIS_0126/labels/DJI_0126_00000211.txt",
@@ -152,24 +154,52 @@ TRAIN_VIS_IR = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 VAL_VIS_IR = [3, 4, 5, 6]
 TEST_VIS_IR = [0, 1, 2]
 
+# Remove NO_LABELS from VIS_IR
+print()
+NEW_VIS_IR = [
+    (f[0], f[1]) for f in VIS_IR if f[0] not in NO_LABELS and f[1] not in NO_LABELS
+]
+TRAIN_VIS_IR = [
+    NEW_VIS_IR.index(VIS_IR[f])
+    for f in TRAIN_VIS_IR
+    if VIS_IR[f] in NEW_VIS_IR
+]
+VAL_VIS_IR = [
+    NEW_VIS_IR.index(VIS_IR[f])
+    for f in VAL_VIS_IR
+    if VIS_IR[f] in NEW_VIS_IR
+]
+TEST_VIS_IR = [
+    NEW_VIS_IR.index(VIS_IR[f])
+    for f in TEST_VIS_IR
+    if VIS_IR[f] in NEW_VIS_IR
+]
+VIS_IR = NEW_VIS_IR
+
 TRAIN_IR = [9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23]
 VAL_IR = [2, 3, 4, 5, 6, 7, 8]
 TEST_IR = [0, 1, 15]
 
 TRAIN_FOLDERS = (
-    [VIS[i] for i in TRAIN_VIS]
-    + [IR[i] for i in TRAIN_IR]
+    [VIS_ONLY[i] for i in TRAIN_VIS]
+    + [IR_ONLY[i] for i in TRAIN_IR]
     + [VIS_IR[i] for i in TRAIN_VIS_IR]
+    + [VIS_IR[i][0] for i in TRAIN_VIS_IR]
+    + [VIS_IR[i][1] for i in TRAIN_VIS_IR]
 )
 VAL_FOLDERS = (
     [VIS[i] for i in VAL_VIS]
     + [IR[i] for i in VAL_IR]
     + [VIS_IR[i] for i in VAL_VIS_IR]
+    + [VIS_IR[i][0] for i in VAL_VIS_IR]
+    + [VIS_IR[i][1] for i in VAL_VIS_IR]
 )
 TEST_FOLDERS = (
     [VIS[i] for i in TEST_VIS]
     + [IR[i] for i in TEST_IR]
     + [VIS_IR[i] for i in TEST_VIS_IR]
+    + [VIS_IR[i][0] for i in TEST_VIS_IR]
+    + [VIS_IR[i][1] for i in TEST_VIS_IR]
 )
 
 RGB_ITEM = 0
@@ -194,21 +224,21 @@ def collate_rgb_ir(rgb, ir):
 
 def get_wisard_folders(folders):
     if folders == "vis":
-        folders = VIS + [f[0] for f in VIS_IR]
+        folders = VIS
     elif folders == "ir":
-        folders = IR + [f[1] for f in VIS_IR]
+        folders = IR
     elif folders == "vis_all_ir_sync":
-        folders = VIS + VIS_IR
+        folders = VIS_ONLY + VIS_IR
     elif folders == "vis_sync_ir_all":
-        folders = IR + VIS_IR
+        folders = IR_ONLY + VIS_IR
     elif folders == "vis_ir":
         folders = VIS_IR
     elif folders == "all":
-        folders = VIS + IR + VIS_IR
+        folders = VIS_ONLY + IR_ONLY + VIS_IR
     elif folders == "vis_only":
-        folders = VIS
+        folders = VIS_ONLY
     elif folders == "ir_only":
-        folders = IR
+        folders = IR_ONLY
     return folders
 
 
@@ -380,7 +410,11 @@ def get_hash(paths):
             else os.path.getsize(p[0]) + os.path.getsize(p[1])
         )
         for p in paths
-        if (isinstance(p, str) and os.path.exists(p) or (os.path.exists(p[0]) and os.path.exists(p[1])))
+        if (
+            isinstance(p, str)
+            and os.path.exists(p)
+            or (os.path.exists(p[0]) and os.path.exists(p[1]))
+        )
     )  # sizes
     h = hashlib.sha256(str(size).encode())  # hash sizes
     hash_paths = []
@@ -414,7 +448,9 @@ def verify_image_label(args):
                 with open(im_file, "rb") as f:
                     f.seek(-2, 2)
                     if f.read() != b"\xff\xd9":  # corrupt JPEG
-                        ImageOps.exif_transpose(Image.open(im_file)).save(im_file, "JPEG", subsampling=0, quality=100)
+                        ImageOps.exif_transpose(Image.open(im_file)).save(
+                            im_file, "JPEG", subsampling=0, quality=100
+                        )
                         msg = f"{prefix}WARNING ⚠️ {im_file}: corrupt JPEG restored and saved"
         if len(im_files) == 1:
             im_files = im_files[0]
@@ -426,18 +462,28 @@ def verify_image_label(args):
                 lb = [x.split() for x in f.read().strip().splitlines() if len(x)]
                 if any(len(x) > 6 for x in lb) and (not keypoint):  # is segment
                     classes = np.array([x[0] for x in lb], dtype=np.float32)
-                    segments = [np.array(x[1:], dtype=np.float32).reshape(-1, 2) for x in lb]  # (cls, xy1...)
-                    lb = np.concatenate((classes.reshape(-1, 1), segments2boxes(segments)), 1)  # (cls, xywh)
+                    segments = [
+                        np.array(x[1:], dtype=np.float32).reshape(-1, 2) for x in lb
+                    ]  # (cls, xy1...)
+                    lb = np.concatenate(
+                        (classes.reshape(-1, 1), segments2boxes(segments)), 1
+                    )  # (cls, xywh)
                 lb = np.array(lb, dtype=np.float32)
             nl = len(lb)
             if nl:
                 if keypoint:
-                    assert lb.shape[1] == (5 + nkpt * ndim), f"labels require {(5 + nkpt * ndim)} columns each"
+                    assert lb.shape[1] == (
+                        5 + nkpt * ndim
+                    ), f"labels require {(5 + nkpt * ndim)} columns each"
                     points = lb[:, 5:].reshape(-1, ndim)[:, :2]
                 else:
-                    assert lb.shape[1] == 5, f"labels require 5 columns, {lb.shape[1]} columns detected"
+                    assert (
+                        lb.shape[1] == 5
+                    ), f"labels require 5 columns, {lb.shape[1]} columns detected"
                     points = lb[:, 1:]
-                assert points.max() <= 1, f"non-normalized or out of bounds coordinates {points[points > 1]}"
+                assert (
+                    points.max() <= 1
+                ), f"non-normalized or out of bounds coordinates {points[points > 1]}"
                 assert lb.min() >= 0, f"negative label values {lb[lb < 0]}"
 
                 # All labels
@@ -454,15 +500,21 @@ def verify_image_label(args):
                     msg = f"{prefix}WARNING ⚠️ {im_files}: {nl - len(i)} duplicate labels removed"
             else:
                 ne = 1  # label empty
-                lb = np.zeros((0, (5 + nkpt * ndim) if keypoint else 5), dtype=np.float32)
+                lb = np.zeros(
+                    (0, (5 + nkpt * ndim) if keypoint else 5), dtype=np.float32
+                )
         else:
             nm = 1  # label missing
             lb = np.zeros((0, (5 + nkpt * ndim) if keypoints else 5), dtype=np.float32)
         if keypoint:
             keypoints = lb[:, 5:].reshape(-1, nkpt, ndim)
             if ndim == 2:
-                kpt_mask = np.where((keypoints[..., 0] < 0) | (keypoints[..., 1] < 0), 0.0, 1.0).astype(np.float32)
-                keypoints = np.concatenate([keypoints, kpt_mask[..., None]], axis=-1)  # (nl, nkpt, 3)
+                kpt_mask = np.where(
+                    (keypoints[..., 0] < 0) | (keypoints[..., 1] < 0), 0.0, 1.0
+                ).astype(np.float32)
+                keypoints = np.concatenate(
+                    [keypoints, kpt_mask[..., None]], axis=-1
+                )  # (nl, nkpt, 3)
         lb = lb[:, :5]
         return im_files, lb, shape, segments, keypoints, nm, nf, ne, nc, msg
     except Exception as e:
@@ -475,7 +527,7 @@ class WiSARDYOLODataset(YOLODataset):
     def __init__(self, *args, **kwargs):
         self.augment_vis_ir = kwargs.pop("augment_vis_ir", False)
         super().__init__(*args, **kwargs)
-    
+
     def get_labels(self):
         """Returns dictionary of labels for YOLO training."""
         self.label_files = img2label_paths(self.im_files)
@@ -551,18 +603,29 @@ class WiSARDYOLODataset(YOLODataset):
                 else:
                     raise FileNotFoundError(f"{self.prefix}{p} does not exist")
             im_files = []
-            for x in f:        
+            for x in f:
                 if isinstance(x, tuple):
-                    if x[0].split(".")[-1].lower() in IMG_FORMATS and x[1].split(".")[-1].lower() in IMG_FORMATS:
-                        im_files.append((x[0].replace("/", os.sep), x[1].replace("/", os.sep)))
+                    if (
+                        x[0].split(".")[-1].lower() in IMG_FORMATS
+                        and x[1].split(".")[-1].lower() in IMG_FORMATS
+                    ):
+                        im_files.append(
+                            (x[0].replace("/", os.sep), x[1].replace("/", os.sep))
+                        )
                     else:
-                        LOGGER.warning(f"WARNING ⚠️ Skipping image pair {x} with different formats")
+                        LOGGER.warning(
+                            f"WARNING ⚠️ Skipping image pair {x} with different formats"
+                        )
                 else:
                     if x.split(".")[-1].lower() in IMG_FORMATS:
                         im_files.append(x.replace("/", os.sep))
                     else:
-                        LOGGER.warning(f"WARNING ⚠️ Skipping image {x} with unsupported format")
-            im_files = sorted(im_files, key=lambda x: x[0] if isinstance(x, tuple) else x)
+                        LOGGER.warning(
+                            f"WARNING ⚠️ Skipping image {x} with unsupported format"
+                        )
+            im_files = sorted(
+                im_files, key=lambda x: x[0] if isinstance(x, tuple) else x
+            )
             # self.img_files = sorted([x for x in f if x.suffix[1:].lower() in IMG_FORMATS])  # pathlib
             assert im_files, f"{self.prefix}No images found in {img_path}"
         except Exception as e:
@@ -669,8 +732,8 @@ class WiSARDYOLODataset(YOLODataset):
             fn = None
             choice = np.random.choice([0, 1, 2], p=[0.25, 0.25, 0.5])
             if choice in [0, 1]:
-                f = f[choice]            
-        
+                f = f[choice]
+
         if im is None:  # not cached in RAM
             if isinstance(im, Path) and fn.exists():  # load npy
                 try:
@@ -684,8 +747,8 @@ class WiSARDYOLODataset(YOLODataset):
             else:  # read image
                 if isinstance(f, (Path, str)):
                     im = cv2.imread(f)  # BGR
-                    if "IR" in f.split(os.sep)[-3].split("_"): # is IR image
-                        im = im[:, :, :1] # only use first channel
+                    if "IR" in f.split(os.sep)[-3].split("_"):  # is IR image
+                        im = im[:, :, :1]  # only use first channel
                 else:
                     im_vis = torch.tensor(cv2.imread(f[0])).permute(2, 0, 1)  # BGR
                     im_ir = torch.tensor(cv2.imread(f[1])).permute(2, 0, 1)  # IR
@@ -724,7 +787,7 @@ class WiSARDYOLODataset(YOLODataset):
             return im, (h0, w0), im.shape[:2]
 
         return self.ims[i], self.im_hw0[i], self.im_hw[i]
-    
+
     @staticmethod
     def collate_fn(batch):
         """Collates data samples into batches."""
@@ -743,7 +806,7 @@ class WiSARDYOLODataset(YOLODataset):
             new_batch["batch_idx"][i] += i  # add target image index for build_targets()
         new_batch["batch_idx"] = torch.cat(new_batch["batch_idx"], 0)
         return new_batch
-    
+
     def build_transforms(self, hyp=None):
         """Builds and appends transforms to the list."""
         if self.augment:
@@ -751,7 +814,9 @@ class WiSARDYOLODataset(YOLODataset):
             hyp.mixup = hyp.mixup if self.augment and not self.rect else 0.0
             transforms = wisard_transforms(self, self.imgsz, hyp)
         else:
-            transforms = Compose([LetterBox(new_shape=(self.imgsz, self.imgsz), scaleup=False)])
+            transforms = Compose(
+                [LetterBox(new_shape=(self.imgsz, self.imgsz), scaleup=False)]
+            )
         transforms.append(
             Format(
                 bbox_format="xywh",
@@ -766,7 +831,6 @@ class WiSARDYOLODataset(YOLODataset):
             )
         )
         return transforms
-
 
 
 def generate_wisard_filelist(root, folders, filename):

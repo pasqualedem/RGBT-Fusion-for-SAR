@@ -41,7 +41,7 @@ def build_preprocessor(params):
             T.Compose(
                 [
                     auto_processor,
-                    lambda x: x['pixel_values'][0],
+                    lambda x: x["pixel_values"][0],
                     lambda x: torch.tensor(x),
                 ]
             ),
@@ -85,11 +85,14 @@ def process_image_annotation_folders(root):
         [os.path.join(annotation_path, ann) for ann in annotations]
     )
     image_paths = sorted([os.path.join(image_path, img) for img in images])
+    assert len(image_paths) == len(
+        annotation_paths
+    ), f"Number of images and annotations do not match: {len(image_paths)} != {len(annotation_paths)}"
     for i in range(len(annotation_paths)):
         assert (
             annotation_paths[i].split("/")[-1].split(".")[0]
             == image_paths[i].split("/")[-1].split(".")[0]
-        )
+        ), f"Image and annotation names do not match: {annotation_paths[i]} != {image_paths[i]}"
     return image_paths, annotation_paths
 
 
@@ -99,12 +102,12 @@ def collate_images(images):
     depths = [image.shape[0] for image in images]
     if len(set(depths)) > 1:
         for i, image in enumerate(images):
-            if image.shape[0] == 4: # RGBT
+            if image.shape[0] == 4:  # RGBT
                 continue
-            elif image.shape[0] == 3: # RGB
+            elif image.shape[0] == 3:  # RGB
                 padding = torch.full((1, *image.shape[1:]), IGNORE_VALUE)
                 images[i] = torch.cat([image, padding], 0)
-            elif image.shape[0] == 1: # Thermal
+            elif image.shape[0] == 1:  # Thermal
                 padding = torch.full((3, *image.shape[1:]), IGNORE_VALUE)
                 images[i] = torch.cat([padding, image], 0)
             else:

@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 
 from sarfusion.data.sard import YOLODataset, download_and_clean
 from sarfusion.data.utils import build_preprocessor, is_annotation_valid
-from sarfusion.data.wisard import MISSING_ANNOTATIONS, TEST_FOLDERS, TRAIN_FOLDERS, VAL_FOLDERS, VIS, IR, VIS_IR, generate_wisard_filelist, get_wisard_folders
+from sarfusion.data.wisard import MISSING_ANNOTATIONS, TEST_FOLDERS, TRAIN_FOLDERS, VAL_FOLDERS, VIS_ONLY, IR_ONLY, VIS_IR, generate_wisard_filelist, get_wisard_folders
 from sarfusion.models import build_model
 from sarfusion.utils.utils import load_yaml
 
@@ -78,7 +78,7 @@ def generate_pose_classification_dataset(output_dir):
                 
 def annotate_rgb_wisard(root, model_yaml):
     accelerator = accelerate.Accelerator()
-    vis = VIS + [f[0] for f in VIS_IR]
+    vis = VIS_ONLY + [f[0] for f in VIS_IR]
     params = load_yaml(model_yaml)
     model_params = params["model"]
     model = build_model(model_params)
@@ -143,7 +143,7 @@ def simplify_wisard(root):
         4: 1, # seated
         5: 0, # stands
     }
-    vis = VIS + [f[0] for f in VIS_IR]    
+    vis = VIS_ONLY + [f[0] for f in VIS_IR]    
             
     for subset in vis:
         print(f"Processing {subset}...")
@@ -172,6 +172,21 @@ def simplify_wisard(root):
             with open(gt_path, 'w') as file:
                 for target in new_targets:
                     file.write(" ".join(map(str, target)) + "\n")
+                    
+
+def check_vis_ir(root):
+    for f in VIS_IR:
+        vis = f[0]
+        ir = f[1]
+        vis_path = f"{root}/{vis}"
+        ir_path = f"{root}/{ir}"
+        vis_images = os.listdir(f"{vis_path}/images")
+        ir_images = os.listdir(f"{ir_path}/images")
+        vis_labels = os.listdir(f"{vis_path}/labels")
+        ir_labels = os.listdir(f"{ir_path}/labels")
+        assert len(vis_images) == len(ir_images), f"Number of VIS and IR images do not match: {len(vis_images)} != {len(ir_images)}"
+        assert len(vis_labels) == len(ir_labels), f"Number of VIS and IR labels do not match: {len(vis_labels)} != {len(ir_labels)}"
+    
                 
                 
 def wisard_to_yolo_dataset(root):
@@ -193,6 +208,8 @@ def wisard_to_yolo_dataset(root):
         print(f"Creating missing annotation {annotation}...")
         with open(f"{root}/{annotation}", 'w') as file:
             pass
+    
+    check_vis_ir(root)
         
     print("Generating VIS filelists...")
     folders = "vis"
