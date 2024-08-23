@@ -193,8 +193,8 @@ TEST_VIS = [15, 16, 17, 18, 19, 20, 21]
 
 TRAIN_VIS_IR = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 VAL_VIS_IR = [
-    3,
-    # 4, RGB is zoomed in
+    # 3, RGB is zoomed in
+    4, 
     5,
     6,
 ]

@@ -12,7 +12,7 @@ parameters:
     name: [yolov10]
     params:
       pretrained_model_name_or_path: ['jameslahm/yolov10s'] # (str, optional) path to model file, i.e. yolov8n.pt, yolov8n.yaml
-  data: [wisards.yaml] # (str, optional) path to data file, i.e. coco128.yaml
+  data: [wisards_vis.yaml] # (str, optional) path to data file, i.e. coco128.yaml
   epochs: [500] # (int) number of epochs to train for
   time: # (float, optional) number of hours to train for, overrides epochs if supplied
   patience: [20] # (int) epochs to wait for no observable improvement for early stopping of training

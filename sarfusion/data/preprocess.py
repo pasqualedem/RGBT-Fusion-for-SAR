@@ -188,32 +188,30 @@ def check_vis_ir(root):
         ir_images = os.listdir(f"{ir_path}/images")
         vis_labels = os.listdir(f"{vis_path}/labels")
         ir_labels = os.listdir(f"{ir_path}/labels")
-        assert len(vis_images) == len(ir_images), f"Number of VIS and IR images do not match: {len(vis_images)} != {len(ir_images)}"
-        assert len(vis_labels) == len(ir_labels), f"Number of VIS and IR labels do not match: {len(vis_labels)} != {len(ir_labels)}"
+        assert len(vis_images) == len(ir_images), f"Number of VIS and IR images do not match: {len(vis_images)} != {len(ir_images)} in {vis} and {ir}"
+        assert len(vis_labels) == len(ir_labels), f"Number of VIS and IR labels do not match: {len(vis_labels)} != {len(ir_labels)} in {vis} and {ir}"
     
                 
                 
 def wisard_to_yolo_dataset(root):
-    subfolders = [os.path.join(root, f) for f in os.listdir(root) if os.path.isdir(os.path.join(root, f))]
-    print(f"Found {len(subfolders)} subfolders.")
-    for subfolder in subfolders:
-        print(f"Processing {subfolder}...")
-        os.makedirs(f"{subfolder}/images", exist_ok=True)
-        os.makedirs(f"{subfolder}/labels", exist_ok=True)
-        for image in tqdm(os.listdir(subfolder)):
-            ext = os.path.splitext(image)[-1]
-            if ext.lower() in ['.jpg', '.jpeg', '.png']:
-                image_path = os.path.join(subfolder, image)
-                label_path = image_path.replace(ext, ".txt")
-                os.rename(image_path, f"{subfolder}/images/{image}")
-                if os.path.exists(label_path):
-                    os.rename(label_path, f"{subfolder}/labels/{image.replace(ext, '.txt')}") 
-    for annotation in MISSING_ANNOTATIONS:
-        print(f"Creating missing annotation {annotation}...")
-        with open(f"{root}/{annotation}", 'w') as file:
-            pass
-    
-    check_vis_ir(root)
+    # subfolders = [os.path.join(root, f) for f in os.listdir(root) if os.path.isdir(os.path.join(root, f))]
+    # print(f"Found {len(subfolders)} subfolders.")
+    # for subfolder in subfolders:
+    #     print(f"Processing {subfolder}...")
+    #     os.makedirs(f"{subfolder}/images", exist_ok=True)
+    #     os.makedirs(f"{subfolder}/labels", exist_ok=True)
+    #     for image in tqdm(os.listdir(subfolder)):
+    #         ext = os.path.splitext(image)[-1]
+    #         if ext.lower() in ['.jpg', '.jpeg', '.png']:
+    #             image_path = os.path.join(subfolder, image)
+    #             label_path = image_path.replace(ext, ".txt")
+    #             os.rename(image_path, f"{subfolder}/images/{image}")
+    #             if os.path.exists(label_path):
+    #                 os.rename(label_path, f"{subfolder}/labels/{image.replace(ext, '.txt')}") 
+    # for annotation in MISSING_ANNOTATIONS:
+    #     print(f"Creating missing annotation {annotation}...")
+    #     with open(f"{root}/{annotation}", 'w') as file:
+    #         pass
         
     print("Generating VIS filelists...")
     folders = "vis"
