@@ -3,11 +3,11 @@ from ultralytics.models.yolov10.train import (
     YOLOv10DetectionTrainer,
     YOLOv10DetectionValidator,
 )
-from ultralytics.utils import DEFAULT_CFG
+from ultralytics.utils import DEFAULT_CFG, LOGGER
 from ultralytics.cfg import cfg2dict, IterableSimpleNamespace
 from sarfusion.data.wisard import WiSARDYOLODataset
 from sarfusion.utils.general import colorstr
-from sarfusion.utils.torch_utils import de_parallel
+from ultralytics.utils.torch_utils import de_parallel, strip_optimizer
 from sarfusion.utils.plots import plot_images
 
 def build_yolo_dataset(cfg, img_path, batch, data, mode="train", rect=False, stride=32):
@@ -88,3 +88,18 @@ class WisardTrainer(YOLOv10DetectionTrainer):
         return YOLOv10DetectionValidator(
             self.test_loader, save_dir=self.save_dir, args=args, _callbacks=self.callbacks
         )
+        
+    def final_eval(self):
+        """Performs final evaluation and validation for object detection YOLO model."""
+        batch_size = self.batch_size if self.args.task == "obb" else self.batch_size * 2
+        test_loader = self.get_dataloader(self.data['test'], batch_size=batch_size, mode="val", rank=-1)
+        for f in self.last, self.best:
+            if f.exists():
+                strip_optimizer(f)  # strip optimizers
+                if f is self.best:
+                    LOGGER.info(f"\nValidating {f}...")
+                    self.validator.args.plots = self.args.plots
+                    self.validator.dataloader = test_loader
+                    self.metrics = self.validator(model=f)
+                    self.metrics.pop("fitness", None)
+                    self.run_callbacks("on_fit_epoch_end")

@@ -553,6 +553,7 @@ def yolo_train(parameters):
     
     trainer.model = build_model(model)
     trainer.train()
+    print()
 
 
 class YoloRun:
