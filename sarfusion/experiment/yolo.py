@@ -102,4 +102,5 @@ class WisardTrainer(YOLOv10DetectionTrainer):
                     self.validator.dataloader = test_loader
                     self.metrics = self.validator(model=f)
                     self.metrics.pop("fitness", None)
+                    self.metrics = {k.replace("metrics/", "test/"): v for k,v in self.metrics.items()}
                     self.run_callbacks("on_fit_epoch_end")
