@@ -120,6 +120,8 @@ def build_yolo_v10(
         model = YOLOv10WiSARD(model=tmp.name, task="detect").model
         weights = pretrained_model.state_dict()
         nc_safe_load(model, weights, nc)
+    else:
+        model = YOLOv10WiSARD(cfg, task="detect").model
     return model
 
 
