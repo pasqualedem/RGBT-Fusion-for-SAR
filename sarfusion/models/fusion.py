@@ -31,8 +31,8 @@ class FusionConv(nn.Module):
     
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=None, dilation=1, groups=1, bias=True):
         super(FusionConv, self).__init__()
-        self.optional_rgb = OptionalConv(3, out_channels, kernel_size, stride=1, padding="same", dilation=dilation, groups=groups, bias=bias)
-        self.optional_ir = OptionalConv(1, out_channels, kernel_size, stride=1, padding="same", dilation=dilation, groups=groups, bias=bias)
+        self.optional_rgb = OptionalConv(3, out_channels, kernel_size, stride=1, padding=1, dilation=dilation, groups=groups, bias=bias)
+        self.optional_ir = OptionalConv(1, out_channels, kernel_size, stride=1, padding=1, dilation=dilation, groups=groups, bias=bias)
         assert in_channels == 4, "in_channels must be 4"
         
         self.conv = Conv(out_channels * 2, out_channels, kernel_size, s=stride, p=padding, d=dilation, g=groups)
