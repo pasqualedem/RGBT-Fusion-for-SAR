@@ -12,7 +12,11 @@ from safetensors.torch import save_file
 
 
 def torch_dict_load(file_path):
-    if file_path.endswith(".pth") or file_path.endswith(".pt") or file_path.endswith(".bin"):
+    if (
+        file_path.endswith(".pth")
+        or file_path.endswith(".pt")
+        or file_path.endswith(".bin")
+    ):
         return torch.load(file_path)
     if file_path.endswith(".safetensors"):
         with safe_open(file_path, framework="pt") as f:
@@ -22,9 +26,13 @@ def torch_dict_load(file_path):
         return d
     raise ValueError("File extension not supported")
 
-        
+
 def torch_dict_save(data, file_path):
-    if file_path.endswith(".pth") or file_path.endswith(".pt") or file_path.endswith(".bin"):
+    if (
+        file_path.endswith(".pth")
+        or file_path.endswith(".pt")
+        or file_path.endswith(".bin")
+    ):
         torch.save(data, file_path)
     elif file_path.endswith(".safetensors"):
         save_file(data, file_path)
@@ -35,7 +43,7 @@ def torch_dict_save(data, file_path):
 def fusion_pretraining_load(model, weights):
     incompatible_keys = model.load_state_dict(weights, strict=False)
     expected_unexpected_keys = ["model.model.0.conv.weight"]
-    expected_missing_keys = [
+    expected_missing_keys_with_emb = [
         "model.model.0.optional_rgb.conv.weight",
         "model.model.0.optional_rgb.conv.bias",
         "model.model.0.optional_rgb.bn.weight",
@@ -56,10 +64,15 @@ def fusion_pretraining_load(model, weights):
         "model.model.0.conv.bn.running_mean",
         "model.model.0.conv.bn.running_var",
     ]
+    expected_missing_keys_without_emb = [
+        item for item in expected_missing_keys_with_emb if "embedding" not in item
+    ]
     assert (
         incompatible_keys.unexpected_keys == expected_unexpected_keys
     ), f"Expected {expected_unexpected_keys}, got {incompatible_keys.unexpected_keys}"
-    assert (incompatible_keys.missing_keys == expected_missing_keys), f"Expected {expected_missing_keys}, got {incompatible_keys.missing_keys}"
+    assert (incompatible_keys.missing_keys == expected_missing_keys_with_emb) or (
+        incompatible_keys.missing_keys == expected_missing_keys_without_emb
+    ), f"Expected {expected_missing_keys_with_emb}, got {incompatible_keys.missing_keys}"
 
 
 def nc_safe_load(model, weights, nc):
@@ -78,7 +91,8 @@ def nc_safe_load(model, weights, nc):
         ]
         for diff in diffs:
             assert (
-                diff[1] == nc or diff[0] == 80 # 80 is the default number of classes of COCO
+                diff[1] == nc
+                or diff[0] == 80  # 80 is the default number of classes of COCO
             ), "Detected a mismatch which is not due to the number of classes"
         print(f"Loading model with {nc} classes")
 
@@ -90,11 +104,15 @@ def yaml_model_load(path):
     path = Path(path)
     if path.stem in (f"yolov{d}{x}6" for x in "nsmlx" for d in (5, 8)):
         new_stem = re.sub(r"(\d+)([nslmx])6(.+)?$", r"\1\2-p6\3", path.stem)
-        LOGGER.warning(f"WARNING ⚠️ Ultralytics YOLO P6 models now use -p6 suffix. Renaming {path.stem} to {new_stem}.")
+        LOGGER.warning(
+            f"WARNING ⚠️ Ultralytics YOLO P6 models now use -p6 suffix. Renaming {path.stem} to {new_stem}."
+        )
         path = path.with_name(new_stem + path.suffix)
 
     if "v10" not in str(path) and "yolo" in str(path):
-        unified_path = re.sub(r"(\d+)([nsblmx])(.+)?$", r"\1\3", str(path))  # i.e. yolov8x.yaml -> yolov8.yaml
+        unified_path = re.sub(
+            r"(\d+)([nsblmx])(.+)?$", r"\1\3", str(path)
+        )  # i.e. yolov8x.yaml -> yolov8.yaml
     else:
         unified_path = path
     yaml_file = check_yaml(unified_path, hard=False) or check_yaml(path)
