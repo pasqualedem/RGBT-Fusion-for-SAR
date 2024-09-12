@@ -12,10 +12,10 @@ parameters:
     name: [yolov10]
     params:
       pretrained_model_name_or_path: ['jameslahm/yolov10s'] # (str, optional) path to model file, i.e. yolov8n.pt, yolov8n.yaml
-      cfg: [cfg/yolofusion-s_noemb.yaml]
+      cfg: [cfg/yolofusion-s.yaml]
       fusion_pretraining: [True]
   data: [wisards_vis_all_ir_sync-test_vis.yaml] # (str, optional) path to data file, i.e. coco128.yaml
-  epochs: [500] # (int) number of epochs to train for
+  epochs: [50] # (int) number of epochs to train for
   time: # (float, optional) number of hours to train for, overrides epochs if supplied
   patience: [20] # (int) epochs to wait for no observable improvement for early stopping of training
   batch: [16] # (int) number of images per batch (-1 for AutoBatch)
