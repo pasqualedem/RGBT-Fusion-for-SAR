@@ -60,6 +60,17 @@
             ]
         },
         {
+            "name": "Tile Wisard",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "tile_wisard"
+            ]
+        },
+        {
             "name": "Experiment",
             "type": "debugpy",
             "request": "launch",
@@ -81,7 +92,7 @@
                 "experiment",
                 "--yolo",
                 "--parameters",
-                "parameters/YOLO/22.yolov10s_noemb-VIS_ALL_IR_SYNC-VIS_TEST.yaml"
+                "parameters/YOLO_Tiled/28.yolov10s-VIS.yaml"
             ]
         },
         {
