@@ -1,12 +1,16 @@
+from io import StringIO
 import os
 import accelerate
+import numpy as np
 from tqdm import tqdm
 from torchvision import transforms
 from PIL import Image, ImageDraw
 
+from ultralytics.data.utils import check_det_dataset
+
 from sarfusion.data.sard import YOLODataset, download_and_clean
 from sarfusion.data.utils import build_preprocessor, is_annotation_valid
-from sarfusion.data.wisard import MISSING_ANNOTATIONS, TEST_FOLDERS, TRAIN_FOLDERS, VAL_FOLDERS, VIS_ONLY, IR_ONLY, VIS_IR, generate_wisard_filelist, get_wisard_folders
+from sarfusion.data.wisard import MISSING_ANNOTATIONS, TEST_FOLDERS, TRAIN_FOLDERS, VAL_FOLDERS, VIS_ONLY, IR_ONLY, VIS_IR, WiSARDYOLODataset, generate_wisard_filelist, get_wisard_folders
 from sarfusion.models import build_model
 from sarfusion.utils.utils import load_yaml
 
@@ -304,4 +308,118 @@ def wisard_to_yolo_dataset(root):
     generate_wisard_filelist(root, test_folders, "test_all.txt")
 
 
-def generate_tiled_wisard(root):
+def generate_tiled_wisard(root, data_yaml, imgsz=4096, tilesize=512, stride=32):
+    root_prefix = root.split("WiSARD")[0]
+    outfolder = f"{root_prefix}WiSARD_Tiled_{tilesize}"
+    os.makedirs(outfolder, exist_ok=True)
+    
+    data_dict = check_det_dataset(data_yaml)
+    phases = ["train", "val", "test"]
+    for phase in phases:
+        img_path = data_dict[phase]
+        dataset = WiSARDYOLODataset(
+            img_path=img_path,
+            imgsz=imgsz,
+            batch_size=1,
+            augment=False,
+            # hyp=None, 
+            rect=False,
+            cache=None,
+            single_cls=False,
+            stride=int(stride),
+            pad=0.0,
+            prefix="",
+            task="detect",
+            classes=None,
+            data=data_dict,
+            fraction=1.0,
+            augment_vis_ir=False,
+        )
+        write_dataset_to_disk(dataset, root, outfolder, imgsz, tilesize, phase)
+    
+
+def write_dataset_to_disk(dataset, root, outfolder, imgsz, tilesize, phase):
+    DISCARD_THRESHOLD = 0.8
+    rgb_only_list = []
+    multimodal_list = []
+    for i, elem in enumerate(tqdm(dataset)):
+        im_file = elem["im_file"]
+        im = elem["img"]
+        classes = elem["cls"]
+        bboxes = elem["bboxes"]
+        for x in range(0, imgsz, tilesize):
+            for y in range(0, imgsz, tilesize):
+                tile = im[:, y:y + tilesize, x:x + tilesize]
+                counts = tile.unique(return_counts=True)[1]
+                if (counts / counts.sum()).max() > DISCARD_THRESHOLD: # Discard tiles with too much padding
+                    continue
+                tile_classes = []
+                tile_bboxes = []
+                for j, bbox in enumerate(bboxes):
+                    x_center, y_center, width, height = bbox
+                    if x_center * imgsz >= x and x_center * imgsz <= x + tilesize and y_center * imgsz >= y and y_center * imgsz <= y + tilesize:
+                        tile_classes.append(classes[j].item())
+                        tile_bboxes.append(bbox)
+                tile = tile.permute(1, 2, 0).numpy()
+                output_string = StringIO()
+                for j, bbox in enumerate(tile_bboxes):
+                    class_label = tile_classes[j]
+                    x_center, y_center, width, height = bbox
+                    x_center = (x_center * imgsz - x) / tilesize
+                    y_center = (y_center * imgsz - y) / tilesize
+                    width = width * imgsz / tilesize
+                    height = height * imgsz / tilesize
+                    output_string.write(f"{class_label} {x_center} {y_center} {width} {height}\n")
+                # Get the final string
+                result = output_string.getvalue()
+                # Close the StringIO object
+                output_string.close()
+                
+                if isinstance(im_file, str):
+                    ext = os.path.splitext(im_file)[-1]
+                    im_file_out = im_file.replace(root, outfolder).replace(ext, f"_{x}_{y}{ext}")
+                    labels_file_out = im_file_out.replace("images", "labels").replace(ext, ".txt")
+                    os.makedirs(os.path.dirname(im_file_out), exist_ok=True)
+                    os.makedirs(os.path.dirname(labels_file_out), exist_ok=True)
+                    tile = Image.fromarray(tile)
+                    tile.save(im_file_out)
+                    with open(labels_file_out, "w") as file:
+                        file.write(result)
+                    rgb_only_list.append(im_file_out)
+                    multimodal_list.append(im_file_out)
+                else:                 
+                    ext_rgb = os.path.splitext(im_file[0])[-1]
+                    ext_ir = os.path.splitext(im_file[1])[-1]
+                    rgb_file_out, ir_file_out = im_file
+                    rgb_file_out = rgb_file_out.replace(root, outfolder).replace(ext_rgb, f"_{x}_{y}{ext_rgb}")
+                    ir_file_out = ir_file_out.replace(root, outfolder).replace(ext_ir, f"_{x}_{y}{ext_ir}")
+                    labels_rgb_file_out = rgb_file_out.replace("images", "labels").replace(f"{ext_rgb}", ".txt")
+                    labels_ir_file_out = ir_file_out.replace("images", "labels").replace(f"{ext_ir}", ".txt")
+                    os.makedirs(os.path.dirname(rgb_file_out), exist_ok=True)
+                    os.makedirs(os.path.dirname(ir_file_out), exist_ok=True)
+                    os.makedirs(os.path.dirname(labels_rgb_file_out), exist_ok=True)
+                    os.makedirs(os.path.dirname(labels_ir_file_out), exist_ok=True)
+                    rgb_image = Image.fromarray(tile[:, :, :3])
+                    ir_image = Image.fromarray(np.repeat(tile[:, :, 3:], 3, axis=2))
+                    rgb_image.save(rgb_file_out)
+                    ir_image.save(ir_file_out)
+                    with open(labels_rgb_file_out, "w") as file:
+                        file.write(result)
+                    with open(labels_ir_file_out, "w") as file:
+                        file.write(result)
+                    rgb_only_list.append(rgb_file_out)
+                    multimodal_list.append((rgb_file_out, ir_file_out))
+    print(f"Finished processing {phase}...")
+        
+    with open(dataset.img_path.replace("_all_ir_sync", "").replace("WiSARD", f"WiSARD_Tiled_{tilesize}"), "w") as file:
+        for item in rgb_only_list:
+            file.write(f"{item}\n")
+    print(f"Finished writing {phase} RGB only filelist...")
+    with open(dataset.img_path.replace("WiSARD", f"WiSARD_Tiled_{tilesize}"), "w") as file:
+        for item in multimodal_list:
+            if isinstance(item, str):
+                file.write(f"{item}\n")
+            else:
+                file.write(f"{item[0]},{item[1]}\n")
+    print(f"Finished writing {phase} multimodal filelist...")
+                        

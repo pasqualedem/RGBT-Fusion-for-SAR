@@ -41,6 +41,15 @@ def annotate_wisard():
     root = "dataset/WiSARD"
     simplify_wisard(root)
     
+    
+@main.command("tile_wisard")
+@click.option("--data", type=str, help="Path to the data yaml file", default="wisards_vis_all_ir_sync-test_vis.yaml")
+def tile_wisard(data):
+    from sarfusion.data.preprocess import generate_tiled_wisard
+    root = "dataset/WiSARD"
+    generate_tiled_wisard(root, data_yaml=data)
+    
+    
 @main.command("experiment")
 @click.option(
     "--parameters", default="parameters.yaml", help="Path to the parameters file"
