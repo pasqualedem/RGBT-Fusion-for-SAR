@@ -38,8 +38,12 @@ video_mime_types = [
 
 
 def build_model():
-    checkpoint_path = "checkpoints/yolo-fusion-v10-s.pt"
-    model = YOLOv10WiSARD(model=checkpoint_path, task="detect")
+    try:
+        model = YOLOv10WiSARD.from_pretrained("pasqualedem/YOLOv10fusion-WiSARD")
+    except Exception as e:
+        print("Error loading model from Hugging Face, trying to load from local checkpoint")
+        checkpoint_path = "checkpoints/yolo-fusion-v10-s.pt"
+        model = YOLOv10WiSARD(model=checkpoint_path, task="detect")
     print("Model loaded successfully")
     model.model.eval()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -89,7 +93,7 @@ app = FastAPI(
 
 # Instantiate the model
 model = build_model()
-imgsz = model.ckpt["train_args"]["imgsz"]
+imgsz = model.model.imgsz
 
 
 class BoundingBox(BaseModel):

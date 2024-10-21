@@ -29,7 +29,8 @@ def build_loss(params, model=None):
     if params.get("requires_model", False):
         params.pop("requires_model")
         params["model"] = unwrap_model(model)
-
+    if hasattr(model, "loss_fn"):
+        return model.loss_fn
     if name in LOSS_REGISTRY:
         return LOSS_REGISTRY[name](**params)
     torch_losses = nn.__dict__

@@ -80,6 +80,15 @@ def run(parameters):
     run_single(param_path=parameters)
     
     
+@main.command("test")
+@click.option(
+    "--parameters", default="parameters.yaml", help="Path to the parameters file"
+)
+def test(parameters):
+    from sarfusion.experiment.experiment import test as run_test
+    run_test(parameters)
+    
+    
 @main.command("yolo")
 @click.option(
     "--parameters", default="parameters.yaml", help="Path to the parameters file"

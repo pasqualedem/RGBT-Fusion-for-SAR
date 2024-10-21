@@ -464,8 +464,8 @@ class WandBLogger(AbstractLogger):
                     class_id = cur_targets[k, 1].int().item()
                     label = id2classes[class_id]
                     box = xywh2xyxy(cur_targets[k, 2:])
-                    H = image.shape[1] # - data_dict.dims[i][1][1][0]
-                    W = image.shape[2] # - data_dict.dims[i][1][1][1]
+                    H = image.shape[1] # - data_dict.dims[i][1][1][2]
+                    W = image.shape[2] # - data_dict.dims[i][1][1][3]
                     box = (box * torch.tensor([H, W, H, W], device=box.device)).int().tolist()
                     box = {
                         "position": {

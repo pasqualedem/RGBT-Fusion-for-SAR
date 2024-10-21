@@ -116,13 +116,20 @@ def nosync_accumulation(accumulate=False, accelerator=None, model=None):
     else:
         with contextlib.nullcontext():
             yield
-
+            
+            
+def get_learnable_params(model, train_params):
+    if hasattr(model, "get_learnable_params"):
+        return model.get_learnable_params(train_params)
+    return [{"params": model.parameters()}]
 
 class WrapperModule(torch.nn.Module):
     def __init__(self, model, loss=None) -> None:
         super().__init__()
         self.model = model
         self.loss = loss
+        if hasattr(self.model, "loss_fn"): # Already a wrapper model
+            self.forward = self.model.forward
 
     def forward(self, input_dict: DataDict):
         model_args = inspect.signature(self.model.forward).parameters
@@ -135,7 +142,7 @@ class WrapperModule(torch.nn.Module):
         return WrapperModelOutput(loss=loss, **result_dict)
 
     def get_learnable_params(self, train_params):
-        model_params = list(self.model.get_learnable_params(train_params))
+        model_params = list(get_learnable_params(self.model, train_params))
         if isinstance(self.loss, torch.nn.Module):
             loss_params = list(self.loss.parameters())
         else:

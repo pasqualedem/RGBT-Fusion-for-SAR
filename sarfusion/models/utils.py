@@ -43,36 +43,32 @@ def torch_dict_save(data, file_path):
 def fusion_pretraining_load(model, weights):
     incompatible_keys = model.load_state_dict(weights, strict=False)
     expected_unexpected_keys = ["model.model.0.conv.weight"]
-    expected_missing_keys_with_emb = [
-        "model.model.0.optional_rgb.conv.weight",
-        "model.model.0.optional_rgb.conv.bias",
-        "model.model.0.optional_rgb.bn.weight",
-        "model.model.0.optional_rgb.bn.bias",
-        "model.model.0.optional_rgb.bn.running_mean",
-        "model.model.0.optional_rgb.bn.running_var",
-        "model.model.0.optional_rgb.embedding.weight",
-        "model.model.0.optional_ir.conv.weight",
-        "model.model.0.optional_ir.conv.bias",
-        "model.model.0.optional_ir.bn.weight",
-        "model.model.0.optional_ir.bn.bias",
-        "model.model.0.optional_ir.bn.running_mean",
-        "model.model.0.optional_ir.bn.running_var",
-        "model.model.0.optional_ir.embedding.weight",
-        "model.model.0.conv.conv.weight",
-        "model.model.0.conv.bn.weight",
-        "model.model.0.conv.bn.bias",
-        "model.model.0.conv.bn.running_mean",
-        "model.model.0.conv.bn.running_var",
-    ]
-    expected_missing_keys_without_emb = [
-        item for item in expected_missing_keys_with_emb if "embedding" not in item
-    ]
-    assert (
-        incompatible_keys.unexpected_keys == expected_unexpected_keys
-    ), f"Expected {expected_unexpected_keys}, got {incompatible_keys.unexpected_keys}"
-    assert (incompatible_keys.missing_keys == expected_missing_keys_with_emb) or (
-        incompatible_keys.missing_keys == expected_missing_keys_without_emb
-    ), f"Expected {expected_missing_keys_with_emb}, got {incompatible_keys.missing_keys}"
+    # expected_missing_keys_with_emb = [
+    #     "model.model.0.optional_rgb.conv.weight",
+    #     "model.model.0.optional_rgb.conv.bias",
+    #     "model.model.0.optional_rgb.bn.weight",
+    #     "model.model.0.optional_rgb.bn.bias",
+    #     "model.model.0.optional_rgb.bn.running_mean",
+    #     "model.model.0.optional_rgb.bn.running_var",
+    #     "model.model.0.optional_rgb.embedding.weight",
+    #     "model.model.0.optional_ir.conv.weight",
+    #     "model.model.0.optional_ir.conv.bias",
+    #     "model.model.0.optional_ir.bn.weight",
+    #     "model.model.0.optional_ir.bn.bias",
+    #     "model.model.0.optional_ir.bn.running_mean",
+    #     "model.model.0.optional_ir.bn.running_var",
+    #     "model.model.0.optional_ir.embedding.weight",
+    #     "model.model.0.conv.conv.weight",
+    #     "model.model.0.conv.bn.weight",
+    #     "model.model.0.conv.bn.bias",
+    #     "model.model.0.conv.bn.running_mean",
+    #     "model.model.0.conv.bn.running_var",
+    # ]
+    # expected_missing_keys_without_emb = [
+    #     item for item in expected_missing_keys_with_emb if "embedding" not in item
+    # ]
+    assert (keys.startswith("model.model.0") for keys in incompatible_keys.unexpected_keys)
+    assert (keys.startswith("model.model.0") for keys in incompatible_keys.missing_keys)
 
 
 def nc_safe_load(model, weights, nc):

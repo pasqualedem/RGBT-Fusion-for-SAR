@@ -7,9 +7,10 @@ from torchvision.transforms import Resize
 
 
 class ResizePadKeepRatio(Resize):
-    def __init__(self, size, interpolation=F.InterpolationMode.BILINEAR):
+    def __init__(self, size, interpolation=F.InterpolationMode.BILINEAR, put_padding_on_right_bottom=True):
         super(ResizePadKeepRatio, self).__init__(size, interpolation)
         self.size = size
+        self.put_padding_on_right_bottom = put_padding_on_right_bottom
 
     def __call__(self, img):
         if isinstance(img, torch.Tensor):
@@ -23,13 +24,16 @@ class ResizePadKeepRatio(Resize):
             new_h = self.size
             new_w = int(w * new_h / h)
         resized = F.resize(img, (new_w, new_h), self.interpolation)
-        r = self.size / new_w, self.size / new_h
+        r = self.size / max(w, h)
         dw, dh = self.size - new_w, self.size - new_h
-        dw /= 2  # divide padding into 2 sides
-        dh /= 2
-        top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
-        left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-        pad = (left, top, right, bottom)
+        if self.put_padding_on_right_bottom:
+            pad = (0, 0, dh, dw)
+        else:
+            dw /= 2  # divide padding into 2 sides
+            dh /= 2
+            top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
+            left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
+            pad = (left, top, right, bottom)
         img = F.pad(resized, pad)
         return img, r, pad
     

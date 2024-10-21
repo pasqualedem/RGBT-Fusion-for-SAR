@@ -493,3 +493,16 @@ class EasyDict(dict):
     def pop(self, k, d=None):
         delattr(self, k)
         return super(EasyDict, self).pop(k, d)
+    
+    
+def itemize_tensor(tensor):
+    if isinstance(tensor, torch.Tensor) and tensor.dim() == 0:
+        return tensor.item()
+    return tensor
+
+def is_itemizable(tensor):
+    return isinstance(tensor, torch.Tensor) and tensor.dim() == 0
+
+
+def make_showable(d: dict):
+    return {k: v for k, v in d.items() if type(v) in [int, float, str, bool]}

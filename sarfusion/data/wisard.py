@@ -389,12 +389,12 @@ class WiSARDDataset(Dataset):
     def __getitem__(self, idx):
         item_type, item = self.items[idx]
 
-        if item_type == self.RGB_ITEM:
+        if item_type == RGB_ITEM:
             img_path, annotation_path = item
             img = self._load_rgb(img_path)
             targets = load_annotations(annotation_path)
             img_path_vis = img_path
-        elif item_type == self.IR_ITEM:
+        elif item_type == IR_ITEM:
             img_path, annotation_path = item
             img = self._load_ir(img_path)
             targets = load_annotations(annotation_path)
@@ -411,26 +411,26 @@ class WiSARDDataset(Dataset):
         data_dict = DataDict(images=img, target=targets)
         if self.image_size is not None:
             dims = torch.tensor([img.size(1), img.size(2)])
-            # data_dict.images, ratio, pad = ResizePadKeepRatio(self.image_size)(img)
-            data_dict.images, ratio, pad = letterbox(
-                img, new_shape=(self.image_size, self.image_size)
-            )
+            data_dict.images, ratio, pad = ResizePadKeepRatio(self.image_size)(img)
+            # data_dict.images, ratio, pad = letterbox(
+            #     img, new_shape=(self.image_size, self.image_size)
+            # )
             if targets.numel() > 0:
                 targets[:, 1:] = xywhn2xyxy(
                     targets[:, 1:],
-                    ratio[1] * dims[1],
-                    ratio[0] * dims[0],
+                    ratio * dims[1],
+                    ratio * dims[0],
                     padw=pad[1],
                     padh=pad[0],
                 )
                 # xywhn2xyxy(t[:, 1:], ratio[1] * dims[1], ratio[0] * dims[0], padw=pad[0], padh=pad[1])
-                targets[:, 1:5] = xyxy2xywhn(
-                    targets[:, 1:5],
-                    w=data_dict.images.shape[2],
-                    h=data_dict.images.shape[1],
-                    clip=True,
-                    eps=1e-3,
-                )
+                # targets[:, 1:5] = xyxy2xywhn(
+                #     targets[:, 1:5],
+                #     w=data_dict.images.shape[2],
+                #     h=data_dict.images.shape[1],
+                #     clip=True,
+                #     eps=1e-3,
+                # )
             data_dict.dims = dims, (ratio, pad)
         if self.return_path:
             data_dict.path = img_path_vis

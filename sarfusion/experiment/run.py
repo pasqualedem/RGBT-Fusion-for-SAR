@@ -26,6 +26,7 @@ from sarfusion.utils.metrics import DetectionEvaluator, Evaluator, build_evaluat
 from sarfusion.utils.utils import (
     RunningAverage,
     load_yaml,
+    make_showable,
     write_yaml,
 )
 
@@ -107,10 +108,7 @@ class Run:
         model_name = self.model_params.get("name")
         logger.info(f"Creating model {model_name}")
         self.model = build_model(params=self.model_params)
-        self.watch_metric = self.train_params["watch_metric"]
-        self.greater_is_better = self.train_params.get("greater_is_better", True)
         logger.info("Creating criterion")
-        self.criterion = build_loss(self.params["loss"], model=self.model)
         self.model = WrapperModule(self.model, self.criterion)
         self.task = self.params.get("task", None)
 
@@ -124,6 +122,7 @@ class Run:
         if self.params.get("train"):
             self._prep_for_training()
 
+        self.compute_val_metrics = lambda: self._compute_metrics(self.val_evaluator)
         if self.val_loader:
             logger.info("Preparing validation dataloader")
             self._prep_for_validation()
@@ -131,6 +130,9 @@ class Run:
         self._load_state()
 
     def _prep_for_training(self):
+        self.criterion = build_loss(self.params["loss"], model=self.model)
+        self.watch_metric = self.train_params["watch_metric"]
+        self.greater_is_better = self.train_params.get("greater_is_better", True)
         logger.info("Creating optimizer")
         if isinstance(self.model, torch.nn.parallel.DistributedDataParallel):
             params = self.model.module.get_learnable_params(self.train_params)
@@ -325,10 +327,15 @@ class Run:
         evaluator: MetricCollection,
         batch_dict: DataDict,
         result_dict: WrapperModelOutput,
-        tot_steps: int,
     ):
         with self.accelerator.no_sync(model=evaluator):
             evaluator.update(batch_dict, result_dict)
+    
+    def _compute_metrics(
+        self,
+        evaluator: MetricCollection,
+    ):
+        with self.accelerator.no_sync(model=evaluator):
             metrics_dict = evaluator.compute()
         metrics_dict = {
             k: v.item() if isinstance(v, torch.Tensor) and v.dim() == 0 else v for k, v in metrics_dict.items()
@@ -349,7 +356,7 @@ class Run:
         self.tracker.log_metric("step", self.global_val_step)
         metrics = (
             self._update_metrics(
-                self.val_evaluator, batch_dict, result_dict, tot_steps
+                self.val_evaluator, batch_dict, result_dict
             )
             or {}
         )
@@ -368,8 +375,7 @@ class Run:
         self.tracker.log_metric("step", self.global_train_step)
         metric_values = {}
         if self.train_evaluator is not None:
-            metric_values = self._update_metrics(self.train_evaluator, batch_dict, result_dict, tot_steps)
-        return metric_values
+            self._update_metrics(self.train_evaluator, batch_dict, result_dict)
 
     def train_epoch(
         self,
@@ -393,11 +399,11 @@ class Run:
             postfix={"loss": 0},
             desc=f"Train Epoch {epoch}/{self.train_params['max_epochs']-1}",
         )
-        metric_values = None
+        metric_values = {}
 
         for batch_idx, batch_dict in bar:
-            # if batch_idx == 100:
-            #     break
+            if batch_idx == 1000:
+                break
             batch_dict = DataDict(**batch_dict)
             self.optimizer.zero_grad()
             result_dict: WrapperModelOutput = self._forward(
@@ -410,12 +416,14 @@ class Run:
             loss_avg.update(loss.item())
             self.tracker.log_metric("loss", loss.item())
 
-            metric_values = self._update_train_metrics(
+            self._update_train_metrics(
                 result_dict,
                 batch_dict,
                 tot_steps,
                 batch_idx,
             )
+            if batch_idx % 100 == 0:
+                metric_values = self.train_evaluator.compute()
             bar.set_postfix(
                 {
                     **metric_values,
@@ -464,22 +472,22 @@ class Run:
 
         with torch.no_grad():
             for batch_idx, batch_dict in bar:
-                # if batch_idx == 100:
-                #     break
+                if batch_idx == 100:
+                    break
                 batch_dict = DataDict(**batch_dict)
                 result_dict: WrapperModelOutput = self.model(batch_dict)
 
-                metrics_value = self._update_val_metrics(
-                    batch_dict, result_dict, tot_steps
-                )
+                self._update_val_metrics(batch_dict, result_dict, tot_steps)
                 loss = result_dict.loss.value.item() if result_dict.loss is not None else 0
                 avg_loss.update(loss)
-                bar.set_postfix(
-                    {
-                        "loss": loss,
-                        **metrics_value,
-                    }
-                )
+                if batch_idx % 100 == 0:
+                    metrics_value = self.val_evaluator.compute()
+                    bar.set_postfix(
+                        {
+                            "loss": loss,
+                            **make_showable(metrics_value),
+                        }
+                    )
 
                 self.global_val_step += 1
                 self.log_predictions(batch_idx, batch_dict, result_dict, epoch)
@@ -516,10 +524,13 @@ class Run:
             )
 
     def restore_best_model(self):
-        filename = self.tracker.local_dir + "/best/model.safetensors"
-        with safe_open(filename, framework="pt") as f:
-            weights = {k: f.get_tensor(k) for k in f.keys()}
-        self.model.load_state_dict(weights)
+        try:
+            filename = self.tracker.local_dir + "/best/model.safetensors"
+            with safe_open(filename, framework="pt") as f:
+                weights = {k: f.get_tensor(k) for k in f.keys()}
+            self.model.load_state_dict(weights)
+        except FileNotFoundError:
+            logger.warning(f"No best model found in {filename}, ensure you are using a pretrained model")
 
     def test(self):
         self.test_loader = self.accelerator.prepare(self.test_loader)

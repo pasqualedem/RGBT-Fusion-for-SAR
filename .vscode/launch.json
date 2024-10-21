@@ -82,6 +82,19 @@
             ]
         },
         {
+            "name": "test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "test",
+                "--parameters",
+                "test_detr.yaml"
+            ]
+        },
+        {
             "name": "Yolo",
             "type": "debugpy",
             "request": "launch",
@@ -92,7 +105,23 @@
                 "experiment",
                 "--yolo",
                 "--parameters",
-                "parameters/YOLO_Tiled/28.yolov10s-VIS.yaml"
+                "parameters/YOLO/17.yolov10m-VIS.yaml"
+            ]
+        },
+        {
+            "name": "Effdet",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "effdettrain.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "datasets/WiSARD_COCO",
+                "--workers=0",
+                "--batch-size=2",
+                "--output=test",
+                "--save-images",
+                "--num-classes=3",
             ]
         },
         {

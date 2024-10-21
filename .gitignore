@@ -150,3 +150,6 @@ checkpoints
 out
 runs
 SarYOLO
+
+output
+test

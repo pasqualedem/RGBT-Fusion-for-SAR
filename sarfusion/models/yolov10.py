@@ -1,5 +1,7 @@
 from copy import deepcopy
+import os
 import torch
+import tempfile
 
 from ultralytics import YOLOv10
 from ultralytics.utils.loss import v10DetectLoss
@@ -21,6 +23,7 @@ from ultralytics.models.yolov10.card import card_template_text
 from sarfusion.experiment.yolo import WisardTrainer
 from sarfusion.models.utils import fusion_pretraining_load, yaml_model_load
 # from sarfusion.utils.lossv10 import v10DetectLoss
+from sarfusion.utils.general import yaml_save
 from sarfusion.utils.structures import ModelOutput
 from sarfusion.models.parse import parse_model
 
@@ -127,6 +130,23 @@ class YOLOv10DetectionModel(BaseModel):
 
 
 class YOLOv10WiSARD(YOLOv10):
+    def __init__(self, model="yolov10n.pt", task=None, verbose=False, 
+                 names=None, imgsz=None):
+        if isinstance(model, dict):
+            # Write dict to a temp YAML file
+            with tempfile.NamedTemporaryFile(suffix=".yaml") as tmp:
+                yaml_save(tmp.name, model)
+                super().__init__(model=tmp.name, task=task, verbose=verbose)
+        else:
+            super().__init__(model=model, task=task, verbose=verbose)
+        if names is not None:
+            setattr(self.model, 'names', names)
+        if imgsz is not None:
+            setattr(self.model, 'imgsz', imgsz)
+        else:
+            if self.ckpt is not None:
+                setattr(self.model, 'imgsz', self.ckpt["train_args"]["imgsz"])
+    
     @property
     def task_map(self):
         """Map head to model, trainer, validator, and predictor classes."""
@@ -168,3 +188,12 @@ class YOLOv10WiSARD(YOLOv10):
         if cfg:
             kwargs['model'] = cfg
         return super().from_pretrained(pretrained_model_name_or_path, **kwargs)
+    
+    def push_to_hub(self, repo_name, **kwargs):
+        config = kwargs.get('config', {})
+        config['names'] = self.names
+        config['model'] = self.model.yaml
+        config['task'] = self.task
+        config['imgsz'] = self.model.imgsz
+        kwargs['config'] = config
+        PyTorchModelHubMixin.push_to_hub(self, repo_name, **kwargs)

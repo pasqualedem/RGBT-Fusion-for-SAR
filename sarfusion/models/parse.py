@@ -58,7 +58,7 @@ from ultralytics.nn.modules import (
 from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, colorstr
 from ultralytics.utils.torch_utils import make_divisible
 
-from sarfusion.models.fusion import FusionConv, OptionalConv
+from sarfusion.models.fusion import FusionConv, FusionTransformer, OptionalConv
 
 
 def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
@@ -122,7 +122,8 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             PSA,
             SCDown,
             C2fCIB,
-            FusionConv
+            FusionConv,
+            FusionTransformer,
         }:
             c1, c2 = ch[f], args[0]
             if c2 != nc:  # if c2 not equal to number of classes (i.e. for Classify() output)

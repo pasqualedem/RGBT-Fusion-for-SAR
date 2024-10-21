@@ -9,6 +9,8 @@ from sarfusion.models.experimental import attempt_load
 from sarfusion.models.utils import torch_dict_load
 from sarfusion.models.utils import nc_safe_load
 from sarfusion.models.yolov10 import YOLOv10WiSARD
+from sarfusion.models.effdet import create_model as build_effdet
+from sarfusion.models.detr import Detr
 from sarfusion.utils.general import yaml_save
 from sarfusion.utils.utils import load_yaml
 
@@ -84,6 +86,10 @@ def build_vit_classifier(**params):
     return vit
 
 
+def build_detr():
+    return Detr()
+
+
 def build_yolo_v9(cfg, nc=None, checkpoint=None, iou_t=0.2, conf_t=0.001, head={}):
     from sarfusion.models.yolo import Model as YOLOv9
 
@@ -129,4 +135,6 @@ MODEL_REGISTRY = {
     "vit_classifier": build_vit_classifier,
     "yolov9": build_yolo_v9,
     "yolov10": build_yolo_v10,
+    "effdet": build_effdet,
+    "detr": build_detr,
 }
