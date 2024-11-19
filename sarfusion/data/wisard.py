@@ -42,6 +42,7 @@ from sarfusion.data.utils import (
     dict_collate_fn,
     load_annotations,
     process_image_annotation_folders,
+    yolo_to_coco_annotations,
 )
 from sarfusion.data.transforms import Format
 from sarfusion.utils.dataloaders import HELP_URL, IMG_FORMATS
@@ -363,6 +364,7 @@ class WiSARDDataset(Dataset):
         return_path=False,
         augment=False,
         image_size=640,
+        single_class=False,
     ):
         self.items = build_wisard_items(root, folders)
         if not self.items:
@@ -372,13 +374,15 @@ class WiSARDDataset(Dataset):
         self.image_size = image_size
         self.augment = augment
         self.return_path = return_path
+        self.single_class = single_class
+        if single_class:
+            self.id2class = {0: "person"}
 
     def __len__(self):
         return len(self.items)
 
     def _load_rgb(self, img_path):
         img = Image.open(img_path).convert("RGB")
-        img = self.transform(img)
         return img
 
     def _load_ir(self, img_path):
@@ -393,6 +397,13 @@ class WiSARDDataset(Dataset):
             img_path, annotation_path = item
             img = self._load_rgb(img_path)
             targets = load_annotations(annotation_path)
+            if self.single_class:
+                for target in targets:
+                    target[0] = 0
+            targets = yolo_to_coco_annotations(bboxes=targets, image_id=idx, img_width=img.size[0], img_height=img.size[1])
+            img, pixel_mask, targets = self.transform(img, annotations=targets, return_tensors="pt").values()
+            img = img[0]
+            targets = targets[0]
             img_path_vis = img_path
         elif item_type == IR_ITEM:
             img_path, annotation_path = item
@@ -406,53 +417,26 @@ class WiSARDDataset(Dataset):
             img = collate_rgb_ir(img_vis, img_ir)
             targets = load_annotations(annotation_path)
             targets_ir = load_annotations(annotation_path_ir)
-        targets = torch.tensor(targets)
 
-        data_dict = DataDict(images=img, target=targets)
-        if self.image_size is not None:
-            dims = torch.tensor([img.size(1), img.size(2)])
-            data_dict.images, ratio, pad = ResizePadKeepRatio(self.image_size)(img)
-            # data_dict.images, ratio, pad = letterbox(
-            #     img, new_shape=(self.image_size, self.image_size)
-            # )
-            if targets.numel() > 0:
-                targets[:, 1:] = xywhn2xyxy(
-                    targets[:, 1:],
-                    ratio * dims[1],
-                    ratio * dims[0],
-                    padw=pad[1],
-                    padh=pad[0],
-                )
-                # xywhn2xyxy(t[:, 1:], ratio[1] * dims[1], ratio[0] * dims[0], padw=pad[0], padh=pad[1])
-                # targets[:, 1:5] = xyxy2xywhn(
-                #     targets[:, 1:5],
-                #     w=data_dict.images.shape[2],
-                #     h=data_dict.images.shape[1],
-                #     clip=True,
-                #     eps=1e-3,
-                # )
-            data_dict.dims = dims, (ratio, pad)
+        data_dict = DataDict(pixel_values=img, labels=dict(targets), dims=targets["orig_size"])
         if self.return_path:
             data_dict.path = img_path_vis
 
         return data_dict
+    
+    def collate_fn(self, batch):
+        pixel_values = [item["pixel_values"] for item in batch]
+        encoding = self.transform.pad(pixel_values, return_tensors="pt")
+        labels = [item["labels"] for item in batch]
+        dims = [item["dims"] for item in batch]
 
-    @classmethod
-    def collate_fn(cls, batch):
-        targets = [sample.target for sample in batch]
-        for d in batch:
-            del d["target"]
-        batch = dict_collate_fn(batch)
-        for i, target in enumerate(targets):
-            if len(target) == 0:
-                target = torch.zeros((0, 5))
-            target = torch.tensor(target)
-            image_index = torch.tensor([i for _ in range(target.size(0))]).unsqueeze(1)
-            targets[i] = torch.cat([image_index, target], dim=1)  # Add image index
-        targets = torch.cat(targets)
-        batch["target"] = targets
+        batch = {}
+        batch["pixel_values"] = encoding["pixel_values"]
+        batch["pixel_mask"] = encoding["pixel_mask"]
+        batch["labels"] = labels
+        batch["dims"] = dims
+
         return batch
-
 
 def img2label_paths(img_paths):
     """Define label paths as a function of image paths."""

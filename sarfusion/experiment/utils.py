@@ -137,9 +137,12 @@ class WrapperModule(torch.nn.Module):
         result_dict = self.model(**model_dict)
         
         loss = None
-        if input_dict.target is not None and self.loss is not None and self.training:
-            loss = self.loss(result_dict, input_dict.target)
-        return WrapperModelOutput(loss=loss, **result_dict)
+        if input_dict.labels is not None and self.loss is not None and self.training:
+            loss = self.loss(result_dict, input_dict.labels)
+        outputs = WrapperModelOutput(**result_dict)
+        if loss is not None:
+            outputs.loss = loss
+        return outputs
 
     def get_learnable_params(self, train_params):
         model_params = list(get_learnable_params(self.model, train_params))

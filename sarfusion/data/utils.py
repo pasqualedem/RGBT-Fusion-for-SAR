@@ -37,16 +37,7 @@ def build_preprocessor(params):
     if "path" in preprocessor_params:
         path = preprocessor_params["path"]
         auto_processor = AutoProcessor.from_pretrained(path, **preprocessor_params)
-        return (
-            T.Compose(
-                [
-                    auto_processor,
-                    lambda x: x["pixel_values"][0],
-                    lambda x: torch.tensor(x),
-                ]
-            ),
-            lambda x: x,
-        )
+        return auto_processor, lambda x: x
     return T.Compose(
         [
             T.ToTensor(),
@@ -117,3 +108,33 @@ def collate_images(images):
             else:
                 raise ValueError(f"Unsupported image shape {image.shape}")
     return torch.stack(images, 0)
+
+
+def yolo_to_coco_annotations(bboxes, image_id, img_width, img_height):
+    annotations = []
+    annotation_id = 0  # Can be used to give unique IDs to annotations
+
+    for bbox in bboxes:
+        class_id, x_center, y_center, width, height = bbox
+
+        # Convert YOLO bbox (center_x, center_y, width, height) to COCO bbox (x_min, y_min, width, height)
+        x_min = (x_center - width / 2) * img_width
+        y_min = (y_center - height / 2) * img_height
+        box_width = width * img_width
+        box_height = height * img_height
+
+        # COCO format annotation
+        annotation = {
+            "id": annotation_id,
+            "image_id": image_id,
+            "category_id": class_id,
+            "bbox": [x_min, y_min, box_width, box_height],
+            "area": box_width * box_height,
+            "iscrowd": 0
+        }
+
+        annotations.append(annotation)
+        annotation_id += 1
+
+    # Return the COCO-formatted annotations as a list of dicts
+    return {"image_id": image_id, "annotations": annotations}

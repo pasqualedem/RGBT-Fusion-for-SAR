@@ -61,7 +61,7 @@ def get_train_val_test_params(name, dataset_params):
     return train_dataset_params, val_dataset_params, test_dataset_params
 
 
-def get_dataloaders(dataset_params, dataloader_params):
+def get_dataloaders(dataset_params, dataloader_params, return_datasets=False):
     dataset_params = dataset_params.copy()
 
     transforms, denormalize = build_preprocessor(dataset_params)
@@ -102,5 +102,11 @@ def get_dataloaders(dataset_params, dataloader_params):
         collate_fn=get_collate_fn(test_set),
         **dataloader_params,
     )
+    if return_datasets:
+        return (train_loader, val_loader, test_loader), (
+            train_set,
+            val_set,
+            test_set,
+        ), (get_collate_fn(train_set), get_collate_fn(val_set), get_collate_fn(test_set)), denormalize
 
     return (train_loader, val_loader, test_loader), denormalize

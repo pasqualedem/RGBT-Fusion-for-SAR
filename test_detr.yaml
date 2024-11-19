@@ -12,7 +12,8 @@ tracker:
 
 model:
   name: detr
-  params: {}
+  params:
+    threshold: 0.5
 
 dataset: # parameters depending on the class you defined for the dataset
   name: wisard
@@ -21,6 +22,7 @@ dataset: # parameters depending on the class you defined for the dataset
   preprocessor:
     path: "facebook/detr-resnet-50"
   folders: vis
+  single_class: true
 
 dataloader:
   num_workers: 0
