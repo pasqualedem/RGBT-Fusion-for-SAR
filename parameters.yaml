@@ -19,7 +19,7 @@ parameters:
     val_image_log_frequency: [30]
 
   train:
-    max_epochs: [50]
+    max_epochs: [10]
     compile: [False]
     initial_lr: [0.00001]
     optimizer: [AdamW]
@@ -32,6 +32,7 @@ parameters:
     params:
       id2label:
         0: [person]
+      threshold: [0.7]
       
 
   dataset: # parameters depending on the class you defined for the dataset
