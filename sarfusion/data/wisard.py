@@ -42,6 +42,7 @@ from sarfusion.data.utils import (
     dict_collate_fn,
     load_annotations,
     process_image_annotation_folders,
+    yolo_to_coco_annotations,
 )
 from sarfusion.data.transforms import Format
 from sarfusion.utils.dataloaders import HELP_URL, IMG_FORMATS
@@ -130,7 +131,7 @@ IR_ONLY = [
     "210327_Airfield_FLIR_IR_8",
 ]
 
-VIS_IR = [
+TOTAL_VIS_IR = [
     (
         "210417_MtErie_Enterprise_VIS_0003",
         "210417_MtErie_Enterprise_IR_0004",
@@ -179,8 +180,8 @@ VIS_IR = [
     ("210924_FHL_Enterprise_VIS_0566", "210924_FHL_Enterprise_IR_0567"),
     ("220109_Baker_Enterprise_VIS_1", "220109_Baker_Enterprise_IR_1"),  # Synced (train)
 ]
-VIS = VIS_ONLY + [f[0] for f in VIS_IR]
-IR = IR_ONLY + [f[1] for f in VIS_IR]
+VIS = VIS_ONLY + [f[0] for f in TOTAL_VIS_IR]
+IR = IR_ONLY + [f[1] for f in TOTAL_VIS_IR]
 
 MISSING_ANNOTATIONS = [
     "210924_FHL_Enterprise_VIS_0126/labels/DJI_0126_00000211.txt",
@@ -191,36 +192,36 @@ TRAIN_VIS = [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
 VAL_VIS = [0, 6, 7, 13, 14]
 TEST_VIS = [15, 16, 17, 18, 19, 20, 21]
 
-TRAIN_VIS_IR = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+TRAIN_VIS_IR = [7, 9, 10, 11, 12, 13, 14, 15, 16]
 VAL_VIS_IR = [
     # 3, RGB is zoomed in
     4, 
     5,
     6,
+    8,
 ]
 TEST_VIS_IR = [0, 1, 2]
 
 # Remove NO_LABELS from VIS_IR
-print()
-NEW_VIS_IR = [
-    (f[0], f[1]) for f in VIS_IR if f[0] not in NO_LABELS and f[1] not in NO_LABELS
+LABELED_VIS_IR = [
+    (f[0], f[1]) for f in TOTAL_VIS_IR if f[0] not in NO_LABELS and f[1] not in NO_LABELS
 ]
 TRAIN_VIS_IR = [
-    NEW_VIS_IR.index(VIS_IR[f])
+    LABELED_VIS_IR.index(TOTAL_VIS_IR[f])
     for f in TRAIN_VIS_IR
-    if VIS_IR[f] in NEW_VIS_IR
+    if TOTAL_VIS_IR[f] in LABELED_VIS_IR
 ]
 VAL_VIS_IR = [
-    NEW_VIS_IR.index(VIS_IR[f])
+    LABELED_VIS_IR.index(TOTAL_VIS_IR[f])
     for f in VAL_VIS_IR
-    if VIS_IR[f] in NEW_VIS_IR
+    if TOTAL_VIS_IR[f] in LABELED_VIS_IR
 ]
 TEST_VIS_IR = [
-    NEW_VIS_IR.index(VIS_IR[f])
+    LABELED_VIS_IR.index(TOTAL_VIS_IR[f])
     for f in TEST_VIS_IR
-    if VIS_IR[f] in NEW_VIS_IR
+    if TOTAL_VIS_IR[f] in LABELED_VIS_IR
 ]
-VIS_IR = NEW_VIS_IR
+VIS_IR = LABELED_VIS_IR
 
 TRAIN_IR = [9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23]
 VAL_IR = [2, 3, 4, 5, 6, 7, 8]
@@ -253,8 +254,11 @@ IR_ITEM = 1
 MULTI_MODALITY_ITEM = 2
 
 
-def collate_rgb_ir(rgb, ir):
-    ir = ir[0:1]  # All channels are the same
+def adapt_ir2rgb(rgb, ir):
+    rgb = tvF.pil_to_tensor(rgb)
+    ir = tvF.pil_to_tensor(ir)
+    
+    # ir = ir[0:1]  # All channels are the same
     # calculate h, w displacement
     rgb_h, rgb_w = rgb.shape[1:]
     ir_h, ir_w = ir.shape[1:]
@@ -265,7 +269,8 @@ def collate_rgb_ir(rgb, ir):
     new_ir = tvF.resize(ir, (new_ir_h, new_ir_w))
     w_pad = (rgb_w - new_ir_w) // 2
     new_ir = tvF.pad(new_ir, (w_pad, 0, w_pad, 0))
-    return torch.cat((rgb, new_ir), dim=0)
+
+    return rgb, new_ir
 
 
 def get_wisard_folders(folders):
@@ -363,28 +368,38 @@ class WiSARDDataset(Dataset):
         return_path=False,
         augment=False,
         image_size=640,
+        single_class=False,
     ):
         self.items = build_wisard_items(root, folders)
         if not self.items:
             raise ValueError("No items found in dataset")
         self.transform = transform
-        self.ir_transform = ir_transform
+        self.ir_transform = ir_transform or transform
         self.image_size = image_size
         self.augment = augment
         self.return_path = return_path
+        self.single_class = single_class
+        if single_class:
+            self.id2class = {0: "person"}
 
     def __len__(self):
         return len(self.items)
 
     def _load_rgb(self, img_path):
         img = Image.open(img_path).convert("RGB")
-        img = self.transform(img)
         return img
 
     def _load_ir(self, img_path):
         img = Image.open(img_path).convert("RGB")
-        img = self.ir_transform(img)
         return img
+    
+    def _load_annotations(self, annotation_path, img, img_id):
+        targets = load_annotations(annotation_path)
+        if self.single_class:
+            for target in targets:
+                target[0] = 0
+        targets = yolo_to_coco_annotations(bboxes=targets, image_id=img_id, img_width=img.size[0], img_height=img.size[1])
+        return targets
 
     def __getitem__(self, idx):
         item_type, item = self.items[idx]
@@ -392,67 +407,53 @@ class WiSARDDataset(Dataset):
         if item_type == RGB_ITEM:
             img_path, annotation_path = item
             img = self._load_rgb(img_path)
-            targets = load_annotations(annotation_path)
+            targets = self._load_annotations(annotation_path, img, idx)
+            inputs = self.transform(img, annotations=targets, return_tensors="pt")
+            img = inputs['pixel_values'][0]
+            targets = inputs['labels'][0]
             img_path_vis = img_path
         elif item_type == IR_ITEM:
             img_path, annotation_path = item
             img = self._load_ir(img_path)
-            targets = load_annotations(annotation_path)
+            targets = self._load_annotations(annotation_path, img, idx)
+            inputs = self.transform(img, annotations=targets, return_tensors="pt")
+            targets = inputs['labels'][0]
+            img = inputs['pixel_values'][0][0:1]
             img_path_vis = img_path
         else:
             (img_path_vis, annotation_path), (img_path_ir, annotation_path_ir) = item
             img_vis = self._load_rgb(img_path_vis)
             img_ir = self._load_ir(img_path_ir)
-            img = collate_rgb_ir(img_vis, img_ir)
-            targets = load_annotations(annotation_path)
-            targets_ir = load_annotations(annotation_path_ir)
-        targets = torch.tensor(targets)
+        
+            targets = self._load_annotations(annotation_path, img_vis, idx)
+            img_vis, img_ir = adapt_ir2rgb(img_vis, img_ir)
+            
+            inputs = self.transform(img_vis, annotations=targets, return_tensors="pt")
+            ir_inputs = self.transform(img_ir, return_tensors="pt")
+            img_vis = inputs['pixel_values'][0]
+            targets = inputs['labels'][0]
+            img_ir = ir_inputs['pixel_values'][0][0:1]
+            img = torch.cat([img_vis, img_ir], dim=0)
 
-        data_dict = DataDict(images=img, target=targets)
-        if self.image_size is not None:
-            dims = torch.tensor([img.size(1), img.size(2)])
-            data_dict.images, ratio, pad = ResizePadKeepRatio(self.image_size)(img)
-            # data_dict.images, ratio, pad = letterbox(
-            #     img, new_shape=(self.image_size, self.image_size)
-            # )
-            if targets.numel() > 0:
-                targets[:, 1:] = xywhn2xyxy(
-                    targets[:, 1:],
-                    ratio * dims[1],
-                    ratio * dims[0],
-                    padw=pad[1],
-                    padh=pad[0],
-                )
-                # xywhn2xyxy(t[:, 1:], ratio[1] * dims[1], ratio[0] * dims[0], padw=pad[0], padh=pad[1])
-                # targets[:, 1:5] = xyxy2xywhn(
-                #     targets[:, 1:5],
-                #     w=data_dict.images.shape[2],
-                #     h=data_dict.images.shape[1],
-                #     clip=True,
-                #     eps=1e-3,
-                # )
-            data_dict.dims = dims, (ratio, pad)
+        data_dict = DataDict(pixel_values=img, labels=dict(targets), dims=targets["orig_size"])
         if self.return_path:
             data_dict.path = img_path_vis
 
         return data_dict
+    
+    def collate_fn(self, batch):
+        pixel_values = [item["pixel_values"] for item in batch]
+        encoding = self.transform.pad(pixel_values, return_tensors="pt", input_data_format="channels_first")
+        labels = [item["labels"] for item in batch]
+        dims = [item["dims"] for item in batch]
 
-    @classmethod
-    def collate_fn(cls, batch):
-        targets = [sample.target for sample in batch]
-        for d in batch:
-            del d["target"]
-        batch = dict_collate_fn(batch)
-        for i, target in enumerate(targets):
-            if len(target) == 0:
-                target = torch.zeros((0, 5))
-            target = torch.tensor(target)
-            image_index = torch.tensor([i for _ in range(target.size(0))]).unsqueeze(1)
-            targets[i] = torch.cat([image_index, target], dim=1)  # Add image index
-        targets = torch.cat(targets)
-        batch["target"] = targets
+        batch = {}
+        batch["pixel_values"] = encoding["pixel_values"]
+        batch["pixel_mask"] = encoding["pixel_mask"]
+        batch["labels"] = labels
+        batch["dims"] = dims
+
         return batch
-
 
 def img2label_paths(img_paths):
     """Define label paths as a function of image paths."""
@@ -819,7 +820,7 @@ class WiSARDYOLODataset(YOLODataset):
                 else:
                     im_vis = torch.tensor(cv2.imread(f[0])).permute(2, 0, 1)  # BGR
                     im_ir = torch.tensor(cv2.imread(f[1])).permute(2, 0, 1)  # IR
-                    im = collate_rgb_ir(im_vis, im_ir).permute(1, 2, 0).numpy()
+                    im = adapt_ir2rgb(im_vis, im_ir).permute(1, 2, 0).numpy()
             if im is None:
                 raise FileNotFoundError(f"Image Not Found {f}")
 

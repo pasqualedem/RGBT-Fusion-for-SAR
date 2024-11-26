@@ -13,7 +13,7 @@ import io
 import torch
 import torchvision.transforms as transforms
 
-from sarfusion.data.wisard import collate_rgb_ir
+from sarfusion.data.wisard import adapt_ir2rgb
 from sarfusion.models import YOLOv10WiSARD
 
 
@@ -124,7 +124,7 @@ def fusion_prepare(rgb_file, infrared_file):
     rgb_tensor = transforms.ToTensor()(rgb_img)
     ir_tensor = transforms.ToTensor()(ir_img)
 
-    input = collate_rgb_ir(rgb_tensor, ir_tensor)
+    input = adapt_ir2rgb(rgb_tensor, ir_tensor)
     input, _, _ = yolo_preprocess(input)
     return input
 
@@ -203,7 +203,7 @@ def fusion_video_prepare_iterator(rgb_file, infrared_file):
         rgb_tensor, _, _ = yolo_preprocess(rgb_tensor)
         ir_tensor, _, _ = yolo_preprocess(ir_tensor)
         
-        input = collate_rgb_ir(rgb_tensor, ir_tensor)
+        input = adapt_ir2rgb(rgb_tensor, ir_tensor)
         yield input
     
     rgb_cap.release()

@@ -20,14 +20,15 @@ class WrapperModelOutput(ModelOutput):
 
 
 class DataDict(EasyDict):
-    images: torch.Tensor
-    target: torch.Tensor
+    pixel_values: torch.Tensor
+    labels: torch.Tensor
+    pixel_mask: torch.Tensor
     dims: tuple
     path: str
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if "images" not in self:
-            self.images = None
-        if "target" not in self:
-            self.target = None
+        if "pixel_values" not in self:
+            self.pixel_values = None
+        if "labels" not in self:
+            self.labels = None

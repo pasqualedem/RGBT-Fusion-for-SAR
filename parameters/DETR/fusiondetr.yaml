@@ -19,9 +19,9 @@ parameters:
     val_image_log_frequency: [30]
 
   train:
-    max_epochs: [1]
+    max_epochs: [10]
     compile: [False]
-    initial_lr: [0.00001, 0.000005, 0.000001]
+    initial_lr: [0.000005, 0.000001]
     optimizer: [AdamW]
     watch_metric: [map]
   
@@ -40,7 +40,7 @@ parameters:
     root: [dataset/WiSARD]
     preprocessor:
       path: ["facebook/detr-resnet-50"]
-    folders: [all, vis_ir, ir, vis_sync_ir_all]
+    folders: [vis_all_ir_sync]
     single_class: [true]
 
   dataloader:

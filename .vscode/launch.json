@@ -82,16 +82,16 @@
             ]
         },
         {
-            "name": "test",
+            "name": "Test",
             "type": "debugpy",
             "request": "launch",
             "program": "main.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "test",
+                "experiment",
                 "--parameters",
-                "test_detr.yaml"
+                "parameters_test.yaml"
             ]
         },
         {

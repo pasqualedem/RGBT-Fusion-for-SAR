@@ -10,7 +10,7 @@ from sarfusion.models.utils import torch_dict_load
 from sarfusion.models.utils import nc_safe_load
 from sarfusion.models.yolov10 import YOLOv10WiSARD
 from sarfusion.models.effdet import create_model as build_effdet
-from sarfusion.models.detr import Detr
+from sarfusion.models.detr import DeformableDetr, Detr, FusionDetr, RTDetr
 from sarfusion.utils.general import yaml_save
 from sarfusion.utils.utils import load_yaml
 
@@ -86,8 +86,20 @@ def build_vit_classifier(**params):
     return vit
 
 
-def build_detr():
-    return Detr()
+def build_detr(threshold=0.9, id2label=None, path="facebook/detr-resnet-50"):
+    return Detr(threshold=threshold, id2label=id2label, pretrained_model_name=path)
+
+
+def build_rtdetr(threshold=0.9, id2label=None):
+    return RTDetr(threshold=threshold, id2label=id2label)
+
+
+def build_deformable_detr(threshold=0.9, id2label=None):
+    return DeformableDetr(threshold=threshold, id2label=id2label)
+
+
+def build_fusion_detr(threshold=0.9, id2label=None):
+    return FusionDetr(threshold=threshold, id2label=id2label)
 
 
 def build_yolo_v9(cfg, nc=None, checkpoint=None, iou_t=0.2, conf_t=0.001, head={}):
@@ -137,4 +149,7 @@ MODEL_REGISTRY = {
     "yolov10": build_yolo_v10,
     "effdet": build_effdet,
     "detr": build_detr,
+    "defdetr": build_deformable_detr,
+    "rtdetr": build_rtdetr,
+    "fusiondetr": build_fusion_detr,
 }

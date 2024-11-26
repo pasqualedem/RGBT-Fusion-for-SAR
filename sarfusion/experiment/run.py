@@ -214,29 +214,32 @@ class Run:
                     )
 
     def launch(self):
-        logger.info("Start training loop...")
-
-        # Train the Model
-        with self.tracker.train():
-            logger.info(
-                f"Running Model Training {self.params.get('experiment').get('name')}"
-            )
-            for epoch in range(self.train_params["max_epochs"]):
+        
+        if self.train_params:
+            logger.info("Start training loop...")
+            # Train the Model
+            with self.tracker.train():
                 logger.info(
-                    "Epoch: {}/{}".format(epoch, self.train_params["max_epochs"])
+                    f"Running Model Training {self.params.get('experiment').get('name')}"
                 )
-                self.train_epoch(epoch)
+                for epoch in range(self.train_params["max_epochs"]):
+                    logger.info(
+                        "Epoch: {}/{}".format(epoch, self.train_params["max_epochs"])
+                    )
+                    self.train_epoch(epoch)
 
-                metrics = None
-                if (
-                    self.val_loader
-                    and epoch % self.train_params.get("val_frequency", 1) == 0
-                ):
-                    with self.tracker.validate():
-                        logger.info(f"Running Model Validation")
-                        metrics = self.validate_epoch(epoch)
-                        self._scheduler_step(SchedulerStepMoment.EPOCH, metrics)
-                self.save_training_state(epoch, metrics)
+                    metrics = None
+                    if (
+                        self.val_loader
+                        and epoch % self.train_params.get("val_frequency", 1) == 0
+                    ):
+                        with self.tracker.validate():
+                            logger.info(f"Running Model Validation")
+                            metrics = self.validate_epoch(epoch)
+                            self._scheduler_step(SchedulerStepMoment.EPOCH, metrics)
+                    self.save_training_state(epoch, metrics)
+        else:
+            logger.info("No training params, no training")
 
         if self.test_loader:
             self.test()
@@ -348,7 +351,7 @@ class Run:
         result_dict: WrapperModelOutput,
         tot_steps,
     ):
-        result_dict.predictions = (
+        result_dict.logits = (
             result_dict.logits.argmax(dim=1)
             if self.task != "detection"
             else result_dict.logits
@@ -360,9 +363,6 @@ class Run:
             )
             or {}
         )
-        # if self.val_evaluator:
-        #     m = self.val_evaluator.update(batch_dict, result_dict)
-        #     metrics = {**metrics, **m}
         return metrics
 
     def _update_train_metrics(
@@ -402,8 +402,8 @@ class Run:
         metric_values = {}
 
         for batch_idx, batch_dict in bar:
-            if batch_idx == 1000:
-                break
+            # if batch_idx == 1000:
+            #     break
             batch_dict = DataDict(**batch_dict)
             self.optimizer.zero_grad()
             result_dict: WrapperModelOutput = self._forward(
@@ -469,11 +469,12 @@ class Run:
             desc=desc,
             disable=not self.accelerator.is_local_main_process,
         )
-
+        self.tracker.create_image_sequence("predictions", columns=['epoch'])
+        
         with torch.no_grad():
             for batch_idx, batch_dict in bar:
-                if batch_idx == 100:
-                    break
+                # if batch_idx == 100:
+                #     break
                 batch_dict = DataDict(**batch_dict)
                 result_dict: WrapperModelOutput = self.model(batch_dict)
 
@@ -501,6 +502,7 @@ class Run:
                 metrics=metrics_dict,
                 epoch=epoch,
             )
+        self.tracker.add_image_sequence("predictions")
         self.accelerator.wait_for_everyone()
 
         metrics_value = self.val_evaluator.compute()
@@ -512,7 +514,7 @@ class Run:
         logger.info(f"{phase} Loss: {avg_loss.compute()}")
         return metrics_dict
 
-    def log_predictions(self, batch_idx, batch_dict, result_dict, epoch):
+    def log_predictions(self, batch_idx, batch_dict, result_dict, epoch, sequence_name="predictions"):
         if self.task == "detection":
             self.tracker.log_object_detection(
                 batch_idx,
@@ -521,6 +523,7 @@ class Run:
                 self.val_loader.dataset.id2class,
                 self.denormalize,
                 epoch,
+                sequence_name=sequence_name,
             )
 
     def restore_best_model(self):

@@ -766,6 +766,14 @@ def xywh2xyxy(x):
     return y
 
 
+def x1y1wh2xyxy(x):
+    # Convert nx4 boxes from [x1, y1, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+    y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
+    y[..., 2] = x[..., 0] + x[..., 2]  # x2
+    y[..., 3] = x[..., 1] + x[..., 3]  # y2
+    return y
+
+
 def xywhn2xyxy(x, w=640, h=640, padw=0, padh=0):
     # Convert nx4 boxes from [x, y, w, h] normalized to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
     y = x.clone() if isinstance(x, torch.Tensor) else np.copy(x)
@@ -794,6 +802,15 @@ def xyn2xy(x, w=640, h=640, padw=0, padh=0):
     y[..., 0] = w * x[..., 0] + padw  # top left x
     y[..., 1] = h * x[..., 1] + padh  # top left y
     return y
+
+
+def denormalize_boxes(boxes, width, height):
+    boxes = boxes.clone() if isinstance(boxes, torch.Tensor) else np.copy(boxes)
+    boxes[:, 0] *= width  # xmin
+    boxes[:, 1] *= height  # ymin
+    boxes[:, 2] *= width  # xmax
+    boxes[:, 3] *= height  # ymax
+    return boxes
 
 
 def segment2box(segment, width=640, height=640):

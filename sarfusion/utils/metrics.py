@@ -20,7 +20,7 @@ from torchmetrics.detection import MeanAveragePrecision
 from sarfusion.utils.structures import DataDict
 from sarfusion.utils.structures import WrapperModelOutput
 from sarfusion.utils import TryExcept, threaded
-from sarfusion.utils.general import box_iou, scale_boxes, xywh2xyxy
+from sarfusion.utils.general import box_iou, denormalize_boxes, scale_boxes, xywh2xyxy
 from sarfusion.utils.utils import itemize_tensor
 
 
@@ -660,7 +660,7 @@ class DetectionEvaluator(Evaluator):
         self.metrics.add_module(
             "mAP",
             MeanAveragePrecision(
-                box_format="xyxy", class_metrics=True
+                box_format="xywh", class_metrics=True
             ),
         )
         self.nc = nc
@@ -677,47 +677,23 @@ class DetectionEvaluator(Evaluator):
         return metrics
 
     def update(self, batch_dict: DataDict, result_dict: WrapperModelOutput):
-        if "logits" not in result_dict:
-            return {}
-        preds = result_dict.logits
-        targets = batch_dict.target
-        dims = batch_dict.dims
-        images = batch_dict.images
-        device = "cuda"
-        
-        pred_list = []
-        target_list = []
-        # Metrics
-        for si, pred in enumerate(preds):
-            labels = targets[targets[:, 0] == si, 1:]
-            nl, npr = labels.shape[0], pred.shape[0]  # number of labels, predictions
-            shape = dims[si][0]
-
-            # Predictions
-            predn = pred.clone()
-            # scale_boxes(images[si].shape[1:], predn[:, :4], shape, dims[si][1])  # native-space pred
-            pred_elem = {
-                "boxes": predn[:, :4],
-                "labels": predn[:, 5].int(),
-                "scores": predn[:, 4]
-            }
-
-            # Evaluate
-            if nl:
-                width, height = shape
-                labels[:, 1:] *= torch.tensor((width, height, width, height), device=device)  # to pixels
-                tbox = xywh2xyxy(labels[:, 1:5])  # target boxes
-                target_elem = {
-                    "boxes": tbox,
-                    "labels": labels[:, 0].int()
+        batch_metrics = []
+        target = []
+        for label in batch_dict.labels:
+            target.append(
+                {
+                    "boxes": label["boxes"],
+                    "labels": label["class_labels"],
                 }
-            else:
-                target_elem = {
-                    "boxes": torch.empty((0, 4), device=device),
-                    "labels": torch.empty((0,), device=device).int()
-                }
-            pred_list.append(pred_elem)
-            target_list.append(target_elem)
-        self.metrics.update(pred_list, target_list)
-        return {}
-
+            )
+        predictions = result_dict['predictions']
+            
+        batch_metrics.append({"preds": predictions, "target": target})
+            
+        all_preds = []
+        all_targets = []
+        for batch in batch_metrics:
+            all_preds.extend(batch["preds"])
+            all_targets.extend(batch["target"])
+    
+        self.metrics.update(preds=all_preds, target=all_targets)

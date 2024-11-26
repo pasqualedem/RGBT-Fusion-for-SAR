@@ -13,7 +13,7 @@ import torch
 import wandb
 from PIL import Image
 from matplotlib import pyplot as plt
-from sarfusion.utils.general import xywh2xyxy
+from sarfusion.utils.general import x1y1wh2xyxy, xywh2xyxy
 from sarfusion.utils.structures import DataDict, WrapperModelOutput
 from sarfusion.tracker.abstract_tracker import AbstractLogger, main_process_only
 
@@ -98,7 +98,9 @@ class WandBLogger(AbstractLogger):
         if ignored_files:
             os.environ["WANDB_IGNORE_GLOBS"] = ignored_files
         if resume:
-            self._resume(offline_directory, run_id, checkpoint_type=resume_checkpoint_type)
+            self._resume(
+                offline_directory, run_id, checkpoint_type=resume_checkpoint_type
+            )
         experiment = None
         if kwargs["accelerator"].is_local_main_process:
             experiment = wandb.init(
@@ -120,7 +122,7 @@ class WandBLogger(AbstractLogger):
             wandb.define_metric("validate/step")
             # set all other validate/ metrics to use this step
             wandb.define_metric("validate/*", step_metric="validate/step")
-            
+
         super().__init__(experiment=experiment, **kwargs)
         if save_code:
             self._save_code()
@@ -131,7 +133,7 @@ class WandBLogger(AbstractLogger):
         self.val_image_log_frequency = val_image_log_frequency
         self.context = ""
         self.sequences = {}
-                
+
     def _resume(self, offline_directory, run_id, checkpoint_type="latest"):
         if not offline_directory:
             offline_directory = "."
@@ -146,9 +148,11 @@ class WandBLogger(AbstractLogger):
                 logger.warning(run)
             logger.warning(f"Using {runs[0]}")
         run = runs[0]
-        self.accelerator_state_dir = os.path.join(wandb_dir, run, "files", checkpoint_type)
+        self.accelerator_state_dir = os.path.join(
+            wandb_dir, run, "files", checkpoint_type
+        )
         logger.info(f"Resuming from {self.accelerator_state_dir}")
-        
+
     def _save_code(self):
         """
         Save the current code to wandb.
@@ -191,8 +195,8 @@ class WandBLogger(AbstractLogger):
         wandb.config.update(config, allow_val_change=self.resume)
         tmp = os.path.join(self.local_dir, "config.yaml")
         write_yaml(config, tmp)
-        # self.add_file("config.yaml") 
-        
+        # self.add_file("config.yaml")
+
     @main_process_only
     def add_tags(self, tags):
         wandb.run.tags = wandb.run.tags + tuple(tags)
@@ -430,11 +434,15 @@ class WandBLogger(AbstractLogger):
     @main_process_only
     def log_metric(self, name, metric, epoch=None):
         wandb.log({f"{self.context}/{name}": metric})
-        
+
     @main_process_only
     def log_confusion_matrix(self, cm, epoch=None):
         title = f"{self.context}/Confusion Matrix"
-        table = wandb.Table(columns=[f"Actual {i}" for i in range(cm.shape[0])], data=cm.tolist(), rows=[f"Predicted {i}" for i in range(cm.shape[1])])
+        table = wandb.Table(
+            columns=[f"Actual {i}" for i in range(cm.shape[0])],
+            data=cm.tolist(),
+            rows=[f"Predicted {i}" for i in range(cm.shape[1])],
+        )
         wandb.log({title: table})
 
     @main_process_only
@@ -446,49 +454,62 @@ class WandBLogger(AbstractLogger):
 
     def __repr__(self):
         return "WandbLogger"
-    
-    def log_object_detection(self, batch_idx, data_dict: DataDict, result_dict: WrapperModelOutput, id2classes, denormalize, epoch):
+
+    def log_object_detection(
+        self,
+        batch_idx,
+        data_dict: DataDict,
+        result_dict: WrapperModelOutput,
+        id2classes,
+        denormalize,
+        epoch,
+        sequence_name=None,
+    ):
         if not log_every_n(batch_idx, self.val_image_log_frequency):
             return
-        images = data_dict.images
-        targets = data_dict.target
-        sequence_name = f"object_detection"
-        self.create_image_sequence(sequence_name, columns=['epoch'])
+        images = data_dict.pixel_values
+        targets = data_dict.labels
+        if sequence_name is None:
+            self.create_image_sequence("object_detection", columns=["epoch"])
 
-        for i in range(len(images)):               
+        for i in range(len(images)):
             image = denormalize(images[i])
             gt_box_data = []
             pred_box_data = []
-            cur_targets = targets[targets[:, 0] == i]
-            for k in range(cur_targets.shape[0]):
-                    class_id = cur_targets[k, 1].int().item()
-                    label = id2classes[class_id]
-                    box = xywh2xyxy(cur_targets[k, 2:])
-                    H = image.shape[1] # - data_dict.dims[i][1][1][2]
-                    W = image.shape[2] # - data_dict.dims[i][1][1][3]
-                    box = (box * torch.tensor([H, W, H, W], device=box.device)).int().tolist()
-                    box = {
-                        "position": {
-                            "minX": box[0],
-                            "minY": box[1],
-                            "maxX": box[2],
-                            "maxY": box[3],
-                        },
-                        "class_id": class_id,
-                        "box_caption": f"{label}",
-                        "domain": "pixel",
-                    }
-                    gt_box_data.append(box)
-            if sum([pred.numel() for pred in result_dict.predictions]) > 0:
+            cur_targets = targets[i]
+            H = image.shape[1]
+            W = image.shape[2]
+            resized_dims = torch.tensor([W, H, W, H], device=image.device)
+            for class_id, box in zip(cur_targets["class_labels"], cur_targets["boxes"]):
+                class_id = int(class_id)
+                label = id2classes[class_id]
+                box = torch.tensor(xywh2xyxy(box))
+                box = (
+                    (box * resized_dims).int().tolist()
+                )
+                box = {
+                    "position": {
+                        "minX": box[0],
+                        "minY": box[1],
+                        "maxX": box[2],
+                        "maxY": box[3],
+                    },
+                    "class_id": class_id,
+                    "box_caption": f"{label}",
+                    "domain": "pixel",
+                }
+                gt_box_data.append(box)
+            if sum([pred["scores"].numel() for pred in result_dict.predictions]) > 0:
                 pred_elem = result_dict.predictions[i]
-                for k in range(pred_elem.shape[0]):
-                    class_id = pred_elem[k, 5].int().item()
-                    conf = pred_elem[k, 4].item()
+                scores = pred_elem["scores"]
+                boxes = pred_elem["boxes"]
+                labels = pred_elem["labels"]
+                for score, box, label in zip(scores, boxes, labels):
+                    class_id = label.int().item()
+                    conf = score.item()
                     label = id2classes[class_id]
-                    box = xywh2xyxy(pred_elem[k, :4]).int().tolist() 
-                    H = image.shape[1] # -  data_dict.dims[i][1][1][0]
-                    W = image.shape[2] # - data_dict.dims[i][1][1][1]
-                    # box = (box * torch.tensor([H, W, H, W], device=box.device)).int().tolist() 
+                    box = torch.tensor(xywh2xyxy(box))
+                    box = (box * resized_dims).int().tolist()
                     box = {
                         "position": {
                             "minX": box[0],
@@ -531,9 +552,11 @@ class WandBLogger(AbstractLogger):
                 f"image_{batch_idx}_sample_{i}",
                 wandb_image,
                 metadata=[epoch],
-                )
-        self.add_image_sequence(sequence_name)
-        
+            )
+
+        if sequence_name is None:
+            self.add_image_sequence(sequence_name)
+
     @contextmanager
     def train(self):
         # Save the old context and set the new one
