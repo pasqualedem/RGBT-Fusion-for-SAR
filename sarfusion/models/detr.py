@@ -11,6 +11,7 @@ from transformers import (
 
 from sarfusion.utils.structures import LossOutput
 from sarfusion.utils.general import xyxy2xywh
+from sarfusion.models.detr_fusion import DetrFusionForObjectDetection
 
 
 def convert_detr_predictions(predictions):
@@ -111,6 +112,17 @@ class RTDetr(BaseDetr):
             processor_class=RTDetrImageProcessor,
             model_class=RTDetrForObjectDetection,
             pretrained_model_name="PekingU/rtdetr_r50vd",
+            id2label=id2label,
+            threshold=threshold,
+        )
+        
+        
+class FusionDetr(BaseDetr):
+    def __init__(self, id2label, threshold=0.9):
+        super(FusionDetr, self).__init__(
+            processor_class=DetrImageProcessor,
+            model_class=DetrFusionForObjectDetection,
+            pretrained_model_name="facebook/detr-resnet-50",
             id2label=id2label,
             threshold=threshold,
         )

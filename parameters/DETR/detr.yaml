@@ -1,7 +1,7 @@
 experiment:
   # It contains all the about the grids and the group of runs:
   name: SARTFusion # name of the logger platform experiment
-  group: DefDETR # name of group of experiments for the logger platform
+  group: DETR # name of group of experiments for the logger platform
   continue_with_errors: False # continue with other runs even if a run fails
   start_from_grid: 0 # skip grids in the grid search
   start_from_run: 0 # skip runs from the selected grid
@@ -21,14 +21,14 @@ parameters:
   train:
     max_epochs: [10]
     compile: [False]
-    initial_lr: [0.000005, 0.000001]
+    initial_lr: [0.00001]
     optimizer: [AdamW]
     watch_metric: [map]
   
   loss:
 
   model:
-    name: [fusiondetr]
+    name: [detr]
     params:
       id2label:
         0: [person]
@@ -40,12 +40,12 @@ parameters:
     root: [dataset/WiSARD]
     preprocessor:
       path: ["facebook/detr-resnet-50"]
-    folders: [vis_all_ir_sync]
+    folders: [vis]
     single_class: [true]
 
   dataloader:
     num_workers: [0]
-    batch_size: [1]
+    batch_size: [1, 2]
   
   # train_evaluation: # evaluation during training
   val_evaluation: # evaluation during validation

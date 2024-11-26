@@ -82,6 +82,7 @@ def get_dataloaders(dataset_params, dataloader_params, return_datasets=False):
     train_loader = torch.utils.data.DataLoader(
         train_set,
         collate_fn=get_collate_fn(train_set),
+        shuffle=True,
         **dataloader_params,
     )
     val_set = dataclass(

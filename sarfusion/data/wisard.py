@@ -254,8 +254,11 @@ IR_ITEM = 1
 MULTI_MODALITY_ITEM = 2
 
 
-def collate_rgb_ir(rgb, ir):
-    ir = ir[0:1]  # All channels are the same
+def adapt_ir2rgb(rgb, ir):
+    rgb = tvF.pil_to_tensor(rgb)
+    ir = tvF.pil_to_tensor(ir)
+    
+    # ir = ir[0:1]  # All channels are the same
     # calculate h, w displacement
     rgb_h, rgb_w = rgb.shape[1:]
     ir_h, ir_w = ir.shape[1:]
@@ -266,7 +269,8 @@ def collate_rgb_ir(rgb, ir):
     new_ir = tvF.resize(ir, (new_ir_h, new_ir_w))
     w_pad = (rgb_w - new_ir_w) // 2
     new_ir = tvF.pad(new_ir, (w_pad, 0, w_pad, 0))
-    return torch.cat((rgb, new_ir), dim=0)
+
+    return rgb, new_ir
 
 
 def get_wisard_folders(folders):
@@ -370,7 +374,7 @@ class WiSARDDataset(Dataset):
         if not self.items:
             raise ValueError("No items found in dataset")
         self.transform = transform
-        self.ir_transform = ir_transform
+        self.ir_transform = ir_transform or transform
         self.image_size = image_size
         self.augment = augment
         self.return_path = return_path
@@ -387,8 +391,15 @@ class WiSARDDataset(Dataset):
 
     def _load_ir(self, img_path):
         img = Image.open(img_path).convert("RGB")
-        img = self.ir_transform(img)
         return img
+    
+    def _load_annotations(self, annotation_path, img, img_id):
+        targets = load_annotations(annotation_path)
+        if self.single_class:
+            for target in targets:
+                target[0] = 0
+        targets = yolo_to_coco_annotations(bboxes=targets, image_id=img_id, img_width=img.size[0], img_height=img.size[1])
+        return targets
 
     def __getitem__(self, idx):
         item_type, item = self.items[idx]
@@ -396,12 +407,10 @@ class WiSARDDataset(Dataset):
         if item_type == RGB_ITEM:
             img_path, annotation_path = item
             img = self._load_rgb(img_path)
-            targets = load_annotations(annotation_path)
-            if self.single_class:
-                for target in targets:
-                    target[0] = 0
-            targets = yolo_to_coco_annotations(bboxes=targets, image_id=idx, img_width=img.size[0], img_height=img.size[1])
-            img, pixel_mask, targets = self.transform(img, annotations=targets, return_tensors="pt").values()
+            targets = self._load_annotations(annotation_path, img, idx)
+            inputs = self.transform(img, annotations=targets, return_tensors="pt")
+            img = inputs['pixel_values']
+            targets = inputs['labels']            
             img = img[0]
             targets = targets[0]
             img_path_vis = img_path
@@ -414,9 +423,20 @@ class WiSARDDataset(Dataset):
             (img_path_vis, annotation_path), (img_path_ir, annotation_path_ir) = item
             img_vis = self._load_rgb(img_path_vis)
             img_ir = self._load_ir(img_path_ir)
-            img = collate_rgb_ir(img_vis, img_ir)
-            targets = load_annotations(annotation_path)
-            targets_ir = load_annotations(annotation_path_ir)
+        
+            targets = self._load_annotations(annotation_path, img_vis, idx)
+            img_vis, img_ir = adapt_ir2rgb(img_vis, img_ir)
+            
+            inputs = self.transform(img_vis, annotations=targets, return_tensors="pt")
+            ir_inputs = self.transform(img_ir, return_tensors="pt")
+            img_vis = inputs['pixel_values']
+            targets = inputs['labels']
+            img_ir = ir_inputs['pixel_values']
+            img_vis = img_vis[0]
+            targets = targets[0]
+            img_ir = img_ir[0][0:1]
+            
+            img = torch.cat([img_vis, img_ir], dim=0)
 
         data_dict = DataDict(pixel_values=img, labels=dict(targets), dims=targets["orig_size"])
         if self.return_path:
@@ -426,7 +446,7 @@ class WiSARDDataset(Dataset):
     
     def collate_fn(self, batch):
         pixel_values = [item["pixel_values"] for item in batch]
-        encoding = self.transform.pad(pixel_values, return_tensors="pt")
+        encoding = self.transform.pad(pixel_values, return_tensors="pt", input_data_format="channels_first")
         labels = [item["labels"] for item in batch]
         dims = [item["dims"] for item in batch]
 
@@ -803,7 +823,7 @@ class WiSARDYOLODataset(YOLODataset):
                 else:
                     im_vis = torch.tensor(cv2.imread(f[0])).permute(2, 0, 1)  # BGR
                     im_ir = torch.tensor(cv2.imread(f[1])).permute(2, 0, 1)  # IR
-                    im = collate_rgb_ir(im_vis, im_ir).permute(1, 2, 0).numpy()
+                    im = adapt_ir2rgb(im_vis, im_ir).permute(1, 2, 0).numpy()
             if im is None:
                 raise FileNotFoundError(f"Image Not Found {f}")
 
