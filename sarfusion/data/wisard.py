@@ -131,7 +131,7 @@ IR_ONLY = [
     "210327_Airfield_FLIR_IR_8",
 ]
 
-VIS_IR = [
+TOTAL_VIS_IR = [
     (
         "210417_MtErie_Enterprise_VIS_0003",
         "210417_MtErie_Enterprise_IR_0004",
@@ -180,8 +180,8 @@ VIS_IR = [
     ("210924_FHL_Enterprise_VIS_0566", "210924_FHL_Enterprise_IR_0567"),
     ("220109_Baker_Enterprise_VIS_1", "220109_Baker_Enterprise_IR_1"),  # Synced (train)
 ]
-VIS = VIS_ONLY + [f[0] for f in VIS_IR]
-IR = IR_ONLY + [f[1] for f in VIS_IR]
+VIS = VIS_ONLY + [f[0] for f in TOTAL_VIS_IR]
+IR = IR_ONLY + [f[1] for f in TOTAL_VIS_IR]
 
 MISSING_ANNOTATIONS = [
     "210924_FHL_Enterprise_VIS_0126/labels/DJI_0126_00000211.txt",
@@ -192,36 +192,36 @@ TRAIN_VIS = [1, 2, 3, 4, 5, 8, 9, 10, 11, 12]
 VAL_VIS = [0, 6, 7, 13, 14]
 TEST_VIS = [15, 16, 17, 18, 19, 20, 21]
 
-TRAIN_VIS_IR = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+TRAIN_VIS_IR = [7, 9, 10, 11, 12, 13, 14, 15, 16]
 VAL_VIS_IR = [
     # 3, RGB is zoomed in
     4, 
     5,
     6,
+    8,
 ]
 TEST_VIS_IR = [0, 1, 2]
 
 # Remove NO_LABELS from VIS_IR
-print()
-NEW_VIS_IR = [
-    (f[0], f[1]) for f in VIS_IR if f[0] not in NO_LABELS and f[1] not in NO_LABELS
+LABELED_VIS_IR = [
+    (f[0], f[1]) for f in TOTAL_VIS_IR if f[0] not in NO_LABELS and f[1] not in NO_LABELS
 ]
 TRAIN_VIS_IR = [
-    NEW_VIS_IR.index(VIS_IR[f])
+    LABELED_VIS_IR.index(TOTAL_VIS_IR[f])
     for f in TRAIN_VIS_IR
-    if VIS_IR[f] in NEW_VIS_IR
+    if TOTAL_VIS_IR[f] in LABELED_VIS_IR
 ]
 VAL_VIS_IR = [
-    NEW_VIS_IR.index(VIS_IR[f])
+    LABELED_VIS_IR.index(TOTAL_VIS_IR[f])
     for f in VAL_VIS_IR
-    if VIS_IR[f] in NEW_VIS_IR
+    if TOTAL_VIS_IR[f] in LABELED_VIS_IR
 ]
 TEST_VIS_IR = [
-    NEW_VIS_IR.index(VIS_IR[f])
+    LABELED_VIS_IR.index(TOTAL_VIS_IR[f])
     for f in TEST_VIS_IR
-    if VIS_IR[f] in NEW_VIS_IR
+    if TOTAL_VIS_IR[f] in LABELED_VIS_IR
 ]
-VIS_IR = NEW_VIS_IR
+VIS_IR = LABELED_VIS_IR
 
 TRAIN_IR = [9, 10, 11, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22, 23]
 VAL_IR = [2, 3, 4, 5, 6, 7, 8]
@@ -409,15 +409,16 @@ class WiSARDDataset(Dataset):
             img = self._load_rgb(img_path)
             targets = self._load_annotations(annotation_path, img, idx)
             inputs = self.transform(img, annotations=targets, return_tensors="pt")
-            img = inputs['pixel_values']
-            targets = inputs['labels']            
-            img = img[0]
-            targets = targets[0]
+            img = inputs['pixel_values'][0]
+            targets = inputs['labels'][0]
             img_path_vis = img_path
         elif item_type == IR_ITEM:
             img_path, annotation_path = item
             img = self._load_ir(img_path)
-            targets = load_annotations(annotation_path)
+            targets = self._load_annotations(annotation_path, img, idx)
+            inputs = self.transform(img, annotations=targets, return_tensors="pt")
+            targets = inputs['labels'][0]
+            img = inputs['pixel_values'][0][0:1]
             img_path_vis = img_path
         else:
             (img_path_vis, annotation_path), (img_path_ir, annotation_path_ir) = item
@@ -429,13 +430,9 @@ class WiSARDDataset(Dataset):
             
             inputs = self.transform(img_vis, annotations=targets, return_tensors="pt")
             ir_inputs = self.transform(img_ir, return_tensors="pt")
-            img_vis = inputs['pixel_values']
-            targets = inputs['labels']
-            img_ir = ir_inputs['pixel_values']
-            img_vis = img_vis[0]
-            targets = targets[0]
-            img_ir = img_ir[0][0:1]
-            
+            img_vis = inputs['pixel_values'][0]
+            targets = inputs['labels'][0]
+            img_ir = ir_inputs['pixel_values'][0][0:1]
             img = torch.cat([img_vis, img_ir], dim=0)
 
         data_dict = DataDict(pixel_values=img, labels=dict(targets), dims=targets["orig_size"])

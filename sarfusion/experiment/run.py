@@ -214,29 +214,32 @@ class Run:
                     )
 
     def launch(self):
-        logger.info("Start training loop...")
-
-        # Train the Model
-        with self.tracker.train():
-            logger.info(
-                f"Running Model Training {self.params.get('experiment').get('name')}"
-            )
-            for epoch in range(self.train_params["max_epochs"]):
+        
+        if self.train_params:
+            logger.info("Start training loop...")
+            # Train the Model
+            with self.tracker.train():
                 logger.info(
-                    "Epoch: {}/{}".format(epoch, self.train_params["max_epochs"])
+                    f"Running Model Training {self.params.get('experiment').get('name')}"
                 )
-                self.train_epoch(epoch)
+                for epoch in range(self.train_params["max_epochs"]):
+                    logger.info(
+                        "Epoch: {}/{}".format(epoch, self.train_params["max_epochs"])
+                    )
+                    self.train_epoch(epoch)
 
-                metrics = None
-                if (
-                    self.val_loader
-                    and epoch % self.train_params.get("val_frequency", 1) == 0
-                ):
-                    with self.tracker.validate():
-                        logger.info(f"Running Model Validation")
-                        metrics = self.validate_epoch(epoch)
-                        self._scheduler_step(SchedulerStepMoment.EPOCH, metrics)
-                self.save_training_state(epoch, metrics)
+                    metrics = None
+                    if (
+                        self.val_loader
+                        and epoch % self.train_params.get("val_frequency", 1) == 0
+                    ):
+                        with self.tracker.validate():
+                            logger.info(f"Running Model Validation")
+                            metrics = self.validate_epoch(epoch)
+                            self._scheduler_step(SchedulerStepMoment.EPOCH, metrics)
+                    self.save_training_state(epoch, metrics)
+        else:
+            logger.info("No training params, no training")
 
         if self.test_loader:
             self.test()
