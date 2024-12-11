@@ -255,8 +255,16 @@ MULTI_MODALITY_ITEM = 2
 
 
 def adapt_ir2rgb(rgb, ir):
-    rgb = tvF.pil_to_tensor(rgb)
-    ir = tvF.pil_to_tensor(ir)
+    if isinstance(rgb, np.ndarray):
+        rgb = torch.from_numpy(rgb)
+        ir = torch.from_numpy(ir)
+    elif isinstance(rgb, Image.Image):
+        rgb = tvF.pil_to_tensor(rgb)
+        ir = tvF.pil_to_tensor(ir)
+    elif isinstance(rgb, torch.Tensor):
+        pass
+    else:
+        raise NotImplementedError(f"Unknown type {type(rgb)}")
     
     # ir = ir[0:1]  # All channels are the same
     # calculate h, w displacement

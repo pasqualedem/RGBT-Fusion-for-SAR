@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+
+from huggingface_hub import PyTorchModelHubMixin
 from transformers import (
     DetrImageProcessor,
     DetrForObjectDetection,
@@ -22,7 +24,7 @@ def convert_detr_predictions(predictions):
     return predictions
 
 
-class BaseDetr(nn.Module):
+class BaseDetr(nn.Module, PyTorchModelHubMixin):
     def __init__(
         self,
         processor_class,
