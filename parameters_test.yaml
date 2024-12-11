@@ -26,8 +26,8 @@ parameters:
     params:
       id2label:
         0: [person]
-      threshold: [0.7]
-      pretrained_path: [checkpoints/fusiondetr_pffks3s9.safetensors]
+      threshold: [0.5, 0.6, 0.7, 0.8, 0.9]
+      pretrained_path: [checkpoints/fusiondetr_vis_b80foknc.safetensors]
       
 
   dataset: # parameters depending on the class you defined for the dataset
@@ -35,7 +35,7 @@ parameters:
     root: [dataset/WiSARD]
     preprocessor:
       path: ["facebook/detr-resnet-50"]
-    folders: [ir]
+    folders: [vis]
     single_class: [true]
 
   dataloader:
@@ -47,3 +47,8 @@ parameters:
     metrics: # no extra metrics except standard evaluator
 
 other_grids:
+  - model:
+      params:
+        pretrained_path: [checkpoints/fusiondetr_ir_00aprtfc.safetensors]
+    dataset:
+      folders: [ir]

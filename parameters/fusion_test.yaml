@@ -17,13 +17,7 @@ parameters:
   tracker:
     ignored_files: ["*.bin,*.safetensors"]
     val_image_log_frequency: [30]
-
-  train:
-    max_epochs: [10]
-    compile: [False]
-    initial_lr: [0.000005, 0.000001]
-    optimizer: [AdamW]
-    watch_metric: [map]
+    tags: [[Test]]
   
   loss:
 
@@ -32,7 +26,8 @@ parameters:
     params:
       id2label:
         0: [person]
-      threshold: [0.7]
+      threshold: [0.5, 0.6, 0.7, 0.8, 0.9]
+      pretrained_path: [checkpoints/fusiondetr_all_tepn3c4l.safetensors]
       
 
   dataset: # parameters depending on the class you defined for the dataset
@@ -40,7 +35,7 @@ parameters:
     root: [dataset/WiSARD]
     preprocessor:
       path: ["facebook/detr-resnet-50"]
-    folders: [vis]
+    folders: [vis, ir, all]
     single_class: [true]
 
   dataloader:
@@ -52,3 +47,12 @@ parameters:
     metrics: # no extra metrics except standard evaluator
 
 other_grids:
+  - model:
+      params:
+        pretrained_path: [checkpoints/fusiondetr_vis-a-ir-s_pffks3s9.safetensors]
+  - model:
+      params:
+        pretrained_path: [checkpoints/fusiondetr_vis-ir_2dm72jvg.safetensors]
+  - model:
+      params:
+        pretrained_path: [checkpoints/fusiondetr_vis-s-ir-a_5jkopgg6.safetensors]
