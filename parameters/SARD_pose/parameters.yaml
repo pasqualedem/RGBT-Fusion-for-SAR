@@ -17,7 +17,7 @@ parameters:
     ignored_files: ["*.bin,*.safetensors"]
 
   train:
-    max_epochs: [50]
+    max_epochs: [1]
     compile: [False]
     initial_lr: [0.0001, 0.00005, 0.00001]
     optimizer: [AdamW]
@@ -47,22 +47,24 @@ parameters:
       path: *model_path
 
   dataloader:
-    num_workers: [0]
+    num_workers: [8]
     batch_size: [16]
   
-  train_metrics:
-    Accuracy: &metric_params
-      num_classes: [6]
-      task: [multiclass]
-      average: [macro]
-    F1Score: *metric_params
-  val_metrics:
-    Accuracy: *metric_params
-    F1Score: *metric_params
-    Precision: *metric_params
-    Recall: *metric_params
-    ConfusionMatrix:
-      num_classes: [6]
-      task: [multiclass]
+  train_evaluation:
+    metrics:
+      Accuracy: &metric_params
+        num_classes: [6]
+        task: [multiclass]
+        average: [macro]
+      F1Score: *metric_params
+  val_evaluation:
+    metrics:
+      Accuracy: *metric_params
+      F1Score: *metric_params
+      Precision: *metric_params
+      Recall: *metric_params
+      ConfusionMatrix:
+        num_classes: [6]
+        task: [multiclass]
 
 other_grids:

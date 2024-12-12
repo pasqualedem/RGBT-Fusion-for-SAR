@@ -551,8 +551,10 @@ class Evaluator(Metric):
         super().__init__()
         self.metrics = metrics
 
-    def update(self, *args, **kwargs):
-        metrics = self.metrics.update(*args, **kwargs)
+    def update(self, batch_dict: DataDict, result_dict: WrapperModelOutput):
+        y_true = batch_dict.labels
+        y_pred = result_dict.logits
+        return self.metrics.update(y_pred, y_true)
 
     def compute(self):
         return self.metrics.compute()

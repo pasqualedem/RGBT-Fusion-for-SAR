@@ -1,8 +1,20 @@
 # RGBT-Fusion-for-SAR
 
+## Overview
+This repository provides tools for processing and analyzing SAR (Search and Rescue) data, leveraging RGBT (RGB-Thermal) data fusion for enhanced performance. It includes scripts for training machine learning models, dataset preprocessing, and running a FastAPI server to interact with the models.
+
+## Features
+- **FastAPI server**: Deploy the application for model inference.
+- **Dataset preprocessing**: Scripts to prepare WiSARD and SARDATA datasets.
+- **Model training**: Train a pose classifier and YOLOv10 for object detection.
+
+---
+
 ## Run the FastAPI server
 
 ### With Docker
+
+Build and run the Docker container to start the FastAPI server:
 
 ```sh
 docker build -t sarfusion .
@@ -10,58 +22,71 @@ docker run -it --rm -p 8000:8000 sarfusion
 ```
 
 ### Without Docker
-After having installed the environment
+
+Run the FastAPI server manually after setting up the environment:
+
 ```sh
 python main.py app
 ```
 
 #### Prepare the conda environment:
 
+Set up and activate the conda environment as follows:
+
 ```bash
 conda env create -f environment.yml
 conda activate sarfusion
 ```
 
+---
+
 ## Train the model
 
-#### Download and prepare the WiSARD dataset:
+### Download and Prepare Datasets
 
-https://drive.google.com/file/d/1PKjGCqUszHH1nMbXUBTwPSDqRabAt_ht
+#### Download the WiSARD dataset:
 
-##### Extract images from the WiSARD dataset and prepare it:
+Download the dataset from the link below:
 
-```bash
-unzip dataset/WiSARDv1.zip -d dataset/WiSARD
-python3 main.py preprocess_wisard
-```
+[WiSARD Dataset](https://drive.google.com/file/d/1PKjGCqUszHH1nMbXUBTwPSDqRabAt_ht)
+
+#### Extract and preprocess the WiSARD dataset:
+
+1. Unzip the dataset:
+    ```bash
+    unzip dataset/WiSARDv1.zip -d dataset/WiSARD
+    ```
+2. Preprocess the dataset:
+    ```bash
+    python3 main.py preprocess_wisard
+    ```
 
 #### Extract classification patches from the SARDATA dataset:
+
+Prepare classification patches using:
 
 ```bash
 python3 main.py preprocess_classification
 ```
 
-#### Train the pose classifier
-    
-```bash
-python3 main.py experiment --parameters="parameters/SARDPose.yaml"
-```
+---
 
-#### Preprocess the WiSARD dataset
+### Train Models
 
-```bash
-python3 main.py preprocess_wisard
-```
+#### Train the Pose Classifier:
 
-#### Annotate the WiSARD dataset with the pose classifier
-Move the pose classifier checkpoint to the `checkpoints` folder and run the following command:
+Train the pose classifier using the following command:
 
 ```bash
-python3 main.py annotate_wisard --model-yaml parameters/WiSARD_pose/parameters.yaml
+python3 main.py experiment --parameters="parameters/SARD_pose/parameters.yaml"
 ```
 
-#### Train the YOLOv10 model
+#### Annotate the WiSARD dataset with the pose classifier:
 
-```bash
-python3 main.py yolo --parameters="parameters/yolo.yaml"
-```
+1. Move the pose classifier checkpoint to the `checkpoints` folder.
+2. Annotate the dataset using:
+    ```bash
+    python3 main.py annotate_wisard --model-yaml parameters/WiSARD_pose/parameters.yaml
+    ```
+
+#### Train the FusionDETR Model:

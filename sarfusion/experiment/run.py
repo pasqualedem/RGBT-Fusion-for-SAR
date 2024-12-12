@@ -15,7 +15,7 @@ from tqdm import tqdm
 from sarfusion.data.wisard import TEST_FOLDERS, TRAIN_FOLDERS, VAL_FOLDERS, generate_wisard_filelist, get_wisard_folders
 from sarfusion.experiment.yolo import WisardTrainer
 from sarfusion.models.yolov10 import YOLOv10WiSARD
-from sarfusion.utils.structures import WrapperModelOutput
+from sarfusion.utils.structures import LossOutput, WrapperModelOutput
 from sarfusion.utils.logger import get_logger
 from sarfusion.data import get_dataloaders
 from sarfusion.utils.structures import DataDict
@@ -306,17 +306,18 @@ class Run:
     def _backward(
         self, batch_idx, input_dict, outputs: WrapperModelOutput, loss_normalizer
     ):
-        loss = outputs.loss.value / loss_normalizer
-        self.accelerator.backward(loss)
+        loss_value = outputs.loss.value if isinstance(outputs.loss, LossOutput) else outputs.loss
+        loss_value = loss_value / loss_normalizer
+        self.accelerator.backward(loss_value)
         check_nan(
             self.model,
             input_dict,
             outputs,
-            loss,
+            loss_value,
             batch_idx,
             self.train_params,
         )
-        return loss
+        return loss_value
 
     def _init_evaluator(self, params, phase="train"):
         evaluator = params.get(f"{phase}_evaluation", None)
@@ -479,13 +480,14 @@ class Run:
                 result_dict: WrapperModelOutput = self.model(batch_dict)
 
                 self._update_val_metrics(batch_dict, result_dict, tot_steps)
-                loss = result_dict.loss.value.item() if result_dict.loss is not None else 0
-                avg_loss.update(loss)
+                loss = result_dict.loss if result_dict.loss is not None else 0
+                loss_value = loss.value if isinstance(result_dict.loss, LossOutput) else result_dict.loss
+                avg_loss.update(loss_value)
                 if batch_idx % 100 == 0:
                     metrics_value = self.val_evaluator.compute()
                     bar.set_postfix(
                         {
-                            "loss": loss,
+                            "loss": loss_value,
                             **make_showable(metrics_value),
                         }
                     )

@@ -63,6 +63,14 @@ class YOLODataset(Dataset):
     
     
 class PoseClassificationDataset(Dataset):
+    id2class = {
+        0: "running",
+        1: "walking",
+        2: "laying_down",
+        3: "not_defined",
+        4: "seated",
+        5: "stands",
+    }
     def __init__(self, root, transform=None, return_path=False):
         self.image_paths = [os.path.join(root, img) for img in os.listdir(root)]
         self.transform = transform
@@ -77,13 +85,12 @@ class PoseClassificationDataset(Dataset):
         cls = int(img_path.split("_")[-1].split(".")[0])
         
         if self.transform:
-            img = self.transform(img)
+            img = self.transform(img, return_tensors="pt")["pixel_values"][0]
         
         data_dict = DataDict(
-            images=img,
-            target=cls
+            pixel_values=img,
+            labels=cls
         )
         if self.return_path:
             data_dict.path = img_path
-            
         return data_dict

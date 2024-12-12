@@ -38,14 +38,15 @@
             ]
         },
         {
-            "name": "Preprocess Wisard",
+            "name": "Train on SARD",
             "type": "debugpy",
             "request": "launch",
             "program": "main.py",
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "preprocess_wisard"
+                "experiment",
+                "--parameters=parameters/SARD_pose/parameters.yaml"
             ]
         },
         {
