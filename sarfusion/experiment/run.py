@@ -306,7 +306,7 @@ class Run:
     def _backward(
         self, batch_idx, input_dict, outputs: WrapperModelOutput, loss_normalizer
     ):
-        loss_value = outputs.loss.value if isinstance(outputs.loss, LossOutput) else outputs.loss
+        loss_value = outputs.loss.value if isinstance(outputs.loss, dict) else outputs.loss
         loss_value = loss_value / loss_normalizer
         self.accelerator.backward(loss_value)
         check_nan(
@@ -481,7 +481,7 @@ class Run:
 
                 self._update_val_metrics(batch_dict, result_dict, tot_steps)
                 loss = result_dict.loss if result_dict.loss is not None else 0
-                loss_value = loss.value if isinstance(result_dict.loss, LossOutput) else result_dict.loss
+                loss_value = loss.value if isinstance(result_dict.loss, dict) else result_dict.loss
                 avg_loss.update(loss_value)
                 if batch_idx % 100 == 0:
                     metrics_value = self.val_evaluator.compute()

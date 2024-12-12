@@ -94,3 +94,9 @@ python3 main.py experiment --parameters="parameters/SARD_pose/parameters.yaml"
     ```
 
 #### Train the FusionDETR Model:
+
+Train the FusionDETR model using the following command:
+
+```bash
+python main.py experiment --parameters "parameters/DETR/fusiondetr.yaml"
+```
