@@ -94,7 +94,8 @@ def annotate_rgb_wisard(root, model_yaml):
 
     print("Placing -1 in all labels...")
     # Place -1 in all labels
-    for subset in tqdm(os.listdir(root)):
+    subsets = list(filter(lambda x: os.path.isdir(f"{root}/{x}"), os.listdir(root)))
+    for subset in tqdm(subsets):
         subset_location = f"{root}/{subset}"
         label_path = f"{subset_location}/labels"
         for label_file in os.listdir(label_path):

@@ -50,7 +50,7 @@ class YOLODataset(Dataset):
         targets = load_annotations(annotation_path)
 
         if self.transform:
-            img = self.transform(img)
+            img = self.transform(img, return_tensors="pt")['pixel_values'][0]
         data_dict = DataDict(
             images=img,
             target=targets
