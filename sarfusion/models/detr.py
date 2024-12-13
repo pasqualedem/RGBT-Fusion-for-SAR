@@ -46,12 +46,13 @@ class BaseDetr(nn.Module, PyTorchModelHubMixin):
         )
         self.threshold = threshold
 
-    def forward(self, pixel_values, labels=None):
+    def forward(self, pixel_values, labels=None, threshold=None):
         outputs = self.model(pixel_values, labels=labels)
         if not self.training:
+            threshold = threshold if threshold is not None else self.threshold
             outputs["predictions"] = convert_detr_predictions(
                 self.processor.post_process_object_detection(
-                    outputs, threshold=self.threshold
+                    outputs, threshold=threshold
                 )
             )
         if "loss" in outputs:

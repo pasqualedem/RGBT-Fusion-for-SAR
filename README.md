@@ -100,3 +100,12 @@ Train the FusionDETR model using the following command:
 ```bash
 python main.py experiment --parameters "parameters/DETR/fusiondetr.yaml"
 ```
+
+#### Test the FusionDETR Model:
+
+Ater moving the trained checkpoint to the `checkpoints` folder, ensuring that their names match in the .yaml file, run the following command to test the model:
+
+
+```bash
+python main.py experiment --parameters "parameters/DETR/fusion_test.yaml"
+```

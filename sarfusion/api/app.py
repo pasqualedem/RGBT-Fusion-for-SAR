@@ -25,7 +25,7 @@ description = """SAR-Fusion API allows you to deal with wilderness images and vi
 
 You will be able to:
 * **Generate bounding boxes from images and videos** 
-* **Compute how many people are present in the photo or video frames** 
+* **Plot bounding boxes on images and videos**
 
 """
 
@@ -219,8 +219,10 @@ app = FastAPI(
 )
 
 # Instantiate the model
-model = build_model()
-PROCESSOR = model.processor if hasattr(model, "processor") else None
+MODELS = {
+    version: build_model(version) for version in VERSIONS
+}
+PROCESSOR = MODELS["all"].processor if hasattr(MODELS["all"], "processor") else None
 
 
 class BoundingBox(BaseModel):
@@ -368,14 +370,17 @@ async def predict(
     rgb_file: Optional[UploadFile] = File(None),
     infrared_file: Optional[UploadFile] = File(None),
     return_plots: Optional[bool] = Header(False),
+    version: Optional[str] = Header("all", examples=["all", "rgb", "ir"]),
+    threshold: Optional[float] = Header(0.5, ge=0, le=1),
 ):
     if rgb_file is None and infrared_file is None:
         raise HTTPException(status_code=400, detail="At least one image is required.")
 
     input = get_input(rgb_file, infrared_file)
+    model = MODELS[version]
 
     with torch.no_grad():
-        output = model(input)
+        output = model(input, threshold=threshold)
     boxes = output["predictions"][0]["boxes"].cpu().numpy()
     scores = output["predictions"][0]["scores"].cpu().numpy()
     labels = output["predictions"][0]["labels"].cpu().numpy()
@@ -411,17 +416,20 @@ def predict_video(
     rgb_video_file: Optional[UploadFile] = File(None),
     infrared_video_file: Optional[UploadFile] = File(None),
     return_plots: Optional[bool] = Header(False),
+    version: Optional[str] = Header("all", examples=["all", "rgb", "ir"]),
+    threshold: Optional[float] = Header(0.5, ge=0, le=1),
 ):
     if rgb_video_file is None and infrared_video_file is None:
         raise HTTPException(status_code=400, detail="At least one image is required.")
 
     predictions = []
     input = list(get_video_input(rgb_video_file, infrared_video_file))
+    model = MODELS[version]
 
     result = []
     for frame in input:
         with torch.no_grad():
-            predictions = model(frame)
+            predictions = model(frame, threshold=threshold)
         result.append(predictions)
 
     if return_plots:

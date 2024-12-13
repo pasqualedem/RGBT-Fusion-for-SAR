@@ -40,7 +40,7 @@ parameters:
     root: [dataset/WiSARD]
     preprocessor:
       path: ["facebook/detr-resnet-50"]
-    folders: [vis]
+    folders: [all]
     single_class: [true]
 
   dataloader:
